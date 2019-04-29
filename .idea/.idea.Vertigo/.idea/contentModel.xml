@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ContentModelStore">
+    <e p="C:\Seed\Vertigo\Vertigo" t="IncludeRecursive">
+      <e p="Assembly-CSharp-Editor.csproj" t="IncludeRecursive" />
+      <e p="Assets" t="Include">
+        <e p="Editor" t="Include">
+          <e p="TextureAtlasEditor.cs" t="Include" />
+        </e>
+        <e p="Vertigo" t="Include">
+          <e p="BlendMode.cs" t="Include" />
+          <e p="BlendOp.cs" t="Include" />
+          <e p="ColorMode.cs" t="Include" />
+          <e p="CompareFunction.cs" t="Include" />
+          <e p="DrawCall.cs" t="Include" />
+          <e p="Geometry.cs" t="Include" />
+          <e p="LightList.cs" t="Include" />
+          <e p="ListAccessor.cs" t="Include" />
+          <e p="MeshRange.cs" t="Include" />
+          <e p="MeshSlice.cs" t="Include" />
+          <e p="Path2D.cs" t="Include" />
+          <e p="RectExtensions.cs" t="Include" />
+          <e p="RenderSettings.cs" t="Include" />
+          <e p="Shaders" t="Include">
+            <e p="Vertigo.cginc" t="Include" />
+            <e p="VertigoBlur.cginc" t="Include" />
+            <e p="VertigoColorEffect.cginc" t="Include" />
+            <e p="VertigoDefault.shader" t="Include" />
+            <e p="VertigoHSVEffect.cginc" t="Include" />
+            <e p="VertigoShineEffect.cginc" t="Include" />
+            <e p="VertigoSoftmask.cginc" t="Include" />
+            <e p="VertigoTransitionEffect.cginc" t="Include" />
+          </e>
+          <e p="ShadowData.cs" t="Include" />
+          <e p="ShadowOutline.cs" t="Include" />
+          <e p="Shape.cs" t="Include" />
+          <e p="ShapeBatch.cs" t="Include" />
+          <e p="ShapeMeshBuffer.cs" t="Include" />
+          <e p="ShapeMeshData.cs" t="Include" />
+          <e p="ShapeType.cs" t="Include" />
+          <e p="ShineEffect.cs" t="Include" />
+          <e p="ShineEffectData.cs" t="Include" />
+          <e p="StencilOp.cs" t="Include" />
+          <e p="StrokePlacement.cs" t="Include" />
+          <e p="TextureAtlas.cs" t="Include" />
+          <e p="TexturePacker.cs" t="Include" />
+          <e p="TexturePointer.cs" t="Include" />
+          <e p="Vertex.cs" t="Include" />
+          <e p="Vertigo.cs" t="Include" />
+          <e p="Vertigo.Src.asmdef" t="Include" />
+          <e p="VertigoBehaviorRoot.cs" t="Include" />
+          <e p="VertigoEffect.cs" t="Include" />
+        </e>
+      </e>
+      <e p="obj" t="ExcludeRecursive" />
+      <e p="packages" t="ExcludeRecursive" />
+      <e p="Temp\bin" t="ExcludeRecursive" />
+      <e p="Vertigo.sln" t="IncludeFlat" />
+      <e p="Vertigo.Src.csproj" t="IncludeRecursive" />
+    </e>
+    <e p="C:\Users\Matt\.Rider2019.1\config\extensions" t="IncludeRecursive" />
+    <e p="C:\Users\Matt\.Rider2019.1\system\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\Matt\.Rider2019.1\system\resharper-host\local\Transient\ReSharperHost\v191\SolutionCaches\_Vertigo.959010422.00" t="ExcludeRecursive" />
+  </component>
+</project>
