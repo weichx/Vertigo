@@ -198,6 +198,10 @@ namespace Vertigo {
 
         }
 
+        public static void CreateStrokeGeometry(ShapeBatch shapeBatch, RangeInt drawCallShapeRange, LightList<Shape> shapes, LightList<Vector3> shapeData) {
+            throw new NotImplementedException();
+        }
+
     }
 
 }

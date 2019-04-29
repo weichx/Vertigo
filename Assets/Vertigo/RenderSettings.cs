@@ -6,8 +6,8 @@ namespace Vertigo {
     public struct RenderSettings {
 
         [FieldOffset(0)] public int blendArgs;
-        [FieldOffset(0)] public BlendMode blendArg0;
-        [FieldOffset(2)] public BlendMode blendArg1;
+        [FieldOffset(0)] public BlendMode blendArgSrc;
+        [FieldOffset(2)] public BlendMode blendArgDst;
 
         [FieldOffset(4)] public int blendOpStencilRefMasks;
         [FieldOffset(4)] public BlendOp blendOp;

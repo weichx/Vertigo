@@ -7,8 +7,7 @@
     SubShader
     {
         Tags {
-            "RenderType"="Transparent"
-            "DisableBatching"="True"
+            "Queue"="Transparent"
         }
         
         Blend SrcAlpha OneMinusSrcAlpha
@@ -105,18 +104,18 @@
 
             fixed4 frag (v2f i) : SV_Target {
                 
-                VertigoPixelize();
-                
-                VertigoTone(i.toneSettings);
-                
-                VertigoHueShift(i.hueSettings);
-                
-                #if VERTIGO_BLUR
-                    VertigoBlur();
-                #endif
-                
-                
-                VertigoSoftMask();
+//                VertigoPixelize();
+//                
+//                VertigoTone(i.toneSettings);
+//                
+//                VertigoHueShift(i.hueSettings);
+//                
+//                #if VERTIGO_BLUR
+//                    VertigoBlur();
+//                #endif
+//                
+//                
+//                VertigoSoftMask();
                 
                 return tex2D(_MainTex, i.uv.xy);
             }

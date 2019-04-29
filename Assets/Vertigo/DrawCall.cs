@@ -9,7 +9,7 @@ namespace Vertigo {
         public int effectDataIndex;
         public RangeInt shapeRange;
         public float3x2 matrix;
-        public bool stroke;
+        public bool isStroke;
         public RenderSettings renderSettings;
         public RangeInt pointRange;
 

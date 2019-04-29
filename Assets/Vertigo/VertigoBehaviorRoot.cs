@@ -9,8 +9,6 @@ public class VertigoBehaviorRoot : MonoBehaviour {
 
     public Texture2D texture;
 
-    public Material material;
-
     public ShadowOutline shadowOutline;
 
     private bool didStart = false;
@@ -20,10 +18,9 @@ public class VertigoBehaviorRoot : MonoBehaviour {
     public void Start() {
         didStart = true;
         ctx = new VertigoContext();
-        ctx.material = material;
       //  Camera.onPostRender += Render;
         //camera.AddCommandBuffer(CameraEvent.AfterEverything, ctx.commandBuffer);
-        shadowOutline = new ShadowOutline(null);
+        shadowOutline = new ShadowOutline(new Material(Shader.Find("Vertigo/Default")));
     }
 
     private void OnDestroy() {
@@ -40,6 +37,7 @@ public class VertigoBehaviorRoot : MonoBehaviour {
         ctx.Rect(0, 0, 112, 188);
         ctx.ClosePath();
         ctx.SetFill(Color.red);
+        ctx.SetTexture(texture, 0);
         shadowOutline.data.color = Color.green;
         shadowOutline.data.offset = shadowOffset;
         ctx.Fill(shadowOutline);

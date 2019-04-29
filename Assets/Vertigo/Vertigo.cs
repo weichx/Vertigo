@@ -17,23 +17,33 @@ namespace Vertigo {
         private LightList<DrawCall> drawCallList;
         public CommandBuffer commandBuffer;
         private RangeInt currentShapeRange;
-
+        private VertigoEffect defaultEffect;
+        public readonly int instanceId;
         private int pathIndex;
 
+        private static int s_InstanceIdGenerator;
+        private VertigoState state;
+        private ShapeBatch.ShapeBatchPool shapeBatchPool;
+        private StructList<IssuedDrawCall> issuedDrawCalls;
         public VertigoContext() {
+
+            instanceId = s_InstanceIdGenerator;
+            s_InstanceIdGenerator += 100000;
+
             shapeData = new LightList<Vector3>(128);
             shapes = new LightList<Shape>(64);
             drawCallList = new LightList<DrawCall>(32);
             commandBuffer = new CommandBuffer();
+            issuedDrawCalls = new StructList<IssuedDrawCall>();
+            shapeBatchPool = new ShapeBatch.ShapeBatchPool();
             shapes.Add(new Shape(ShapeType.Unset));
-            renderedEffectList = new LightList<VertigoEffect>();
         }
 
         public void Clear() {
             shapes.Clear();
             shapeData.Clear();
             drawCallList.Clear();
-            renderedEffectList.Clear();
+            issuedDrawCalls.Clear();
             shapes.Add(new Shape(ShapeType.Unset));
             currentShapeRange = new RangeInt();
         }
@@ -42,7 +52,7 @@ namespace Vertigo {
             DrawCall call = new DrawCall();
             call.effect = VertigoEffect.Default;
             call.effectDataIndex = 0;
-            call.stroke = true;
+            call.isStroke = true;
             call.matrix = transform;
             call.shapeRange = currentShapeRange;
             drawCallList.Add(call);
@@ -127,7 +137,7 @@ namespace Vertigo {
             DrawCall call = new DrawCall();
             call.effect = VertigoEffect.Default;
             call.matrix = transform;
-            call.stroke = false;
+            call.isStroke = false;
             call.shapeRange = currentShapeRange;
             drawCallList.Add(call);
         }
@@ -140,7 +150,7 @@ namespace Vertigo {
             DrawCall call = new DrawCall();
             call.effect = effect ?? VertigoEffect.Default;
             call.matrix = transform;
-            call.stroke = false;
+            call.isStroke = false;
             call.shapeRange = currentShapeRange;
             call.effectDataIndex = effect.StoreState();
             drawCallList.Add(call);
@@ -207,148 +217,104 @@ namespace Vertigo {
 
         public void Stroke() { }
 
-        public Material material;
+        public void SetDefaultEffect(VertigoEffect effect) {
+            this.defaultEffect = effect ?? VertigoEffect.Default;
+        }
 
-        private LightList<VertigoEffect> renderedEffectList;
-
-        public unsafe void Render(Camera camera, RenderTexture targetTexture = null, bool clear = true) {
-//            commandBuffer.SetRenderTarget(targetTexture);
-
-            commandBuffer.Clear();
-            ShapeBatch shapeBatch = new ShapeBatch();
-
-            if (clear) {
-//                commandBuffer.ClearRenderTarget(true, true, Color.blue);
-            }
-
-            int drawCallCount = drawCallList.Count;
-            DrawCall[] drawCalls = drawCallList.Array;
-
-            for (int i = 0; i < drawCallCount; i++) {
-                DrawCall drawCall = drawCalls[i];
-                // do culling
-
-                // do batching
-
-                if (drawCall.effect != null && !renderedEffectList.Contains(drawCall.effect)) {
-                    renderedEffectList.Add(drawCall.effect);
-                }
-
-                if (drawCall.stroke) { }
-                else {
-                    Geometry.CreateFillGeometry(shapeBatch, drawCall.shapeRange, shapes, shapeData);
-                    int start = drawCall.shapeRange.start;
-                    int end = drawCall.shapeRange.end;
-
-                    for (int j = start; j < end; j++) {
-                        MeshSlice slice = new MeshSlice(shapeBatch, j);
-                        drawCall.effect?.Fill(shapeBatch, drawCall.effectDataIndex, slice, shapes.Array[j]);
-                        slice.batch = null;
-                    }
-                }
-
-                // commandBuffer.DrawMesh(shapeBatch.GetBakedMesh(), Matrix4x4.identity, material, 0, 0, block);
-//                Graphics.DrawMesh(shapeBatch.GetBakedMesh(), Matrix4x4.identity, material, 0, 0, block);
-                Vector3 offset = camera.transform.position;
-                offset.z = -2;
-                Matrix4x4 mat = Matrix4x4.TRS(offset, Quaternion.identity, Vector3.one);
-                Mesh m = shapeBatch.GetBakedMesh();
-                Graphics.DrawMesh(m, mat, material, 0, camera, 0, null, ShadowCastingMode.Off, false, null, LightProbeUsage.Off);
-            }
-
-            VertigoEffect[] renderedEffects = this.renderedEffectList.Array;
-            for (int i = 0; i < renderedEffectList.Count; i++) {
-                renderedEffects[i].ClearState(); // might need to take an id since effects can be reused 
-            }
-
-            renderedEffectList.Clear();
-//            DrawCall lastCall = default;
-//
-//            List<Vertex> input = new List<Vertex>(128);
-//            List<Vertex> output = new List<Vertex>(128);
-//
-//          
-//            // todo handle rotation of target transform and take from position
-//            Rect viewport = new Rect(0, 0, targetTexture.width, targetTexture.height);
-//
-//            MeshBuilder meshBuilder = new MeshBuilder();
-//            List<Shape> renderedShapes = new List<Shape>();
-//            List<Rect> boundsList = new List<Rect>();
-//
-//            for (int i = 0; i < drawCalls.Count; i++) {
-//                // do culling (also apply scissor rect and maybe a basic clip test if clip shape is set and simple)
-//                DrawCall call = drawCalls[i];
-//
-////                    call.effect.GetShapeBounds(call.path.shapes, points, boundsList);
-//
-//                for (int j = 0; j < call.path.shapes.Count; j++) {
-//                    // effect get bounds(data, shapes, output);
-//                //    if (!viewport.ContainOrOverlap(call.path.shapes[j].bounds)) {
-//                        renderedShapes.Add(call.path.shapes[j]);
-//                  //  }
-//                }
-//
-//             //   Geometry.CreateFillGeometry(meshBuilder, call.matrix, renderedShapes);
-//
-//                // now generate geometry for non culled shapes
-//                for (int j = 0; j < renderedShapes.Count; j++) { }
-//
-//                // now let the effect do it's magic
-//                for (int j = 0; j < renderedShapes.Count; j++) { }
-//
-//                // call.effect.Fill(data, shape, meshBuilder);
-//
-//                if (!lastCall.CanBatchWith(ref call)) {
-//                    block.Clear();
-////                    lastCall.effect.Stroke();
-//                    lastCall.effect.PopulateMaterialBlock(block);
-//                    //   commandBuffer.DrawMesh(mesh, lastCall.matrix, lastCall.effect.material, 0, 0, block);
-//                }
-//
-////                // if culling passes, generate base geometry
-////                for (int j = 0; j < call.path.shapes.Count; j++) {
-////                    Geometry.Stroke(5f, call.path.shapes[j], positions, input);
-//                // call.effect.Stroke(this, call.effect, input, output);
-////                    if (lastBatchMesh != null) {
-////                        lastBatchMesh.Append(meshBuilder);
-////                        meshBuilder.Clear();
-////                    }
-////                }
-//            }
-
-//            Graphics.ExecuteCommandBuffer(commandBuffer);
-//            commandBuffer.Clear();
+        public T GetDefaultEffect<T>() where T : VertigoEffect {
+            return defaultEffect as T;
         }
 
         public void SetFill(Color color) { }
 
+        private struct IssuedDrawCall {
+
+            public VertigoEffect effect;
+            public Material material;
+            public int drawCallId;
+
+        }
+
+        public void Render(Camera camera, RenderTexture targetTexture = null, bool clear = true) {
+
+            int drawCallId = instanceId;
+            shapeBatchPool.Release();
+
+            commandBuffer.Clear();
+            ShapeBatch shapeBatch = shapeBatchPool.Get();
+
+            Vector3 offset = camera.transform.position;
+            offset.z = -2;
+            Matrix4x4 rootMatrix = Matrix4x4.TRS(offset, Quaternion.identity, Vector3.one);
+
+            int drawCallCount = drawCallList.Count;
+            DrawCall[] drawCalls = drawCallList.Array;
+
+            VertigoEffect currentEffect = VertigoEffect.Default;
+            IssuedDrawCall issuedDrawCall = default;
+
+            for (int i = 0; i < drawCallCount; i++) {
+                DrawCall drawCall = drawCalls[i];
+
+                // do culling unless current effect wants to do culling itself (for things like shadow which render outside shape's bounds)
+                // should maybe handle culling for masking if using aligned rect mask w/o texture
+
+                // Cull(drawCall)
+
+                if (drawCall.isStroke) {
+                    Geometry.CreateStrokeGeometry(shapeBatch, drawCall.shapeRange, shapes, shapeData);
+                }
+                else {
+                    Geometry.CreateFillGeometry(shapeBatch, drawCall.shapeRange, shapes, shapeData);
+                }
+
+                // draw current effect now if we need to     
+                if (currentEffect != drawCall.effect && shapeBatch.finalPositionList.Count > 0) { // change this to a vertex check
+                    issuedDrawCall = new IssuedDrawCall();
+                    issuedDrawCall.drawCallId = drawCallId++;
+                    issuedDrawCall.effect = currentEffect;
+                    issuedDrawCall.material = currentEffect.GetMaterialToDraw(drawCallId, state, shapeBatch, block);
+
+                    Graphics.DrawMesh(shapeBatch.GetBakedMesh(), rootMatrix, issuedDrawCall.material, 0, camera, 0, null, ShadowCastingMode.Off, false, null, LightProbeUsage.Off);
+
+                    shapeBatch = shapeBatchPool.Get();
+                    issuedDrawCalls.Add(issuedDrawCall);
+                }
+
+                currentEffect = drawCall.effect;
+                int start = drawCall.shapeRange.start;
+                int end = drawCall.shapeRange.end;
+
+                for (int j = start; j < end; j++) {
+                    MeshSlice slice = new MeshSlice(shapeBatch, j);
+                    drawCall.effect.ModifyShapeMesh(shapeBatch, drawCall.effectDataIndex, slice, shapes.Array[j]);
+                    slice.batch = null;
+                }
+
+            }
+
+            issuedDrawCall = new IssuedDrawCall();
+            issuedDrawCall.drawCallId = drawCallId++;
+            issuedDrawCall.effect = currentEffect;
+            issuedDrawCall.material = currentEffect.GetMaterialToDraw(drawCallId, state, shapeBatch, block);
+
+            Graphics.DrawMesh(shapeBatch.GetBakedMesh(), rootMatrix, issuedDrawCall.material, 0, camera, 0, block, ShadowCastingMode.Off, false, null, LightProbeUsage.Off);
+            // commandBuffer.DrawMesh(shapeBatch.GetBakedMesh(), Matrix4x4.identity, material, 0, 0, block);
+            issuedDrawCalls.Add(issuedDrawCall);
+
+            shapeBatch = shapeBatchPool.Get(); // let last batch get queued to release and setup for next frame
+
+            
+            for (int i = 0; i < issuedDrawCalls.Count; i++) {
+                issuedDrawCalls[i].effect.ReleaseMaterial(issuedDrawCall.drawCallId, issuedDrawCall.material);
+            }
+
+        }
+
+        public void SetTexture(Texture2D texture, int i) {
+            state.renderState.texture0 = texture;
+        }
+
     }
 
 }
-
-// for each shape
-// if shape is a curve it might bend out of the containing rect so we have to generate the geometry for it before cull testing
-// if shape is text, test bounds
-// if shape is path if any segment is in view just draw it all
-
-// if the effect demands post-transformation culling we have to generate geometry, process it, then do culling
-
-// generate points only if we need to (can rect test viewport)
-
-// decompose into shapes 
-// shape has a bounds
-// shape belongs to a draw call
-// for each draw call
-// for each shape
-// test against target texture size
-// if full outside, drop the shape
-// if shape count is 0
-// drop the call
-
-// another batching strategy
-// when drawing an effect
-// find other calls with same effect
-// walk backwards doing bounds checks per draw call
-// if found and no call between start and end intersect or contain the next call, add it to batch safely
-
-// first do a cull pass, generate geometry as needed

@@ -86,7 +86,6 @@ namespace Vertigo {
             mesh.MarkDynamic();
         }
 
-        private int triOffset = 0;
         public void AddMeshData(in MeshSlice slice) {
             if (slice.batch != this) {
                 throw new Exception("Invalid slice for batch");
@@ -110,20 +109,11 @@ namespace Vertigo {
             int size = triangleOutput.size;
             int startSize = positionOutput.size - vertexCount;
             
-            // 0, 1, 2
-            // 2, 3, 0
-            
-            // 4, 5, 6
-            // 6, 7, 4
-            
-            // copy triangles
-            // for each one offset by vertex start?
             for (int i = start; i < end; i++) {
                 tris[size++] = startSize + initialTriangles.Array[i];
             }
 
             triangleOutput.size += end - start;
-//            AddRangeUnsafe(ref triangleOutput, initialTriangles.Array, slice.triangleStart, slice.triangleCount);
         }
 
         public void AddMeshData(ShapeMeshBuffer buffer) {
@@ -154,6 +144,7 @@ namespace Vertigo {
         }
 
         internal void Clear() {
+            triangleIndex = 0;
             mesh.Clear(true);
             // todo when this is stable just set count to 0, old data is safe to overwrite
             shapeList.QuickClear();
@@ -174,6 +165,15 @@ namespace Vertigo {
             finalUV1List.Clear();
             finalUV2List.Clear();
             finalTriangleList.Clear();
+
+            positionOutput.size = 0;
+            normalOutput.size = 0;
+            texCoordOutput0.size = 0;
+            texCoordOutput1.size = 0;
+            texCoordOutput2.size = 0;
+            colorOutput.size = 0;
+            triangleOutput.size = 0;
+            
         }
 
         private static void AddRange<T>(ref ArrayView<T> target, T[] source, int count) where T : struct {
@@ -319,6 +319,43 @@ namespace Vertigo {
             return mesh;
         }
 
+        internal class ShapeBatchPool {
+
+            private ShapeBatch[] pool;
+            private int size;
+            private int ptr;
+
+            private readonly LightList<ShapeBatch> available;
+            private readonly LightList<ShapeBatch> releaseQueue;
+
+            public ShapeBatchPool() {
+                this.available = new LightList<ShapeBatch>();
+                this.releaseQueue = new LightList<ShapeBatch>();
+            }
+
+            public ShapeBatch Get() {
+                ShapeBatch retn = null;
+                if (available.Count == 0) {
+                    retn = new ShapeBatch();
+                }
+                else {
+                    retn = available.RemoveLast();
+                }
+
+                releaseQueue.Add(retn);
+                return retn;
+            }
+
+            public void Release() {
+                for (int i = 0; i < releaseQueue.Count; i++) {
+                    releaseQueue[i].Clear();
+                }
+                
+                available.AddRange(releaseQueue);
+                releaseQueue.QuickClear();
+            }
+
+        }
     }
 
 }
