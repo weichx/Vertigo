@@ -1,7 +1,7 @@
 #ifndef INCLUDE_VERTIGO_BLUR
 #define INCLUDE_VERTIGO_BLUR
 
-fixed4 Texture2DAdvancedBlur3x3(sampler2D texture, half2 texCoord, half2 blur, half4 mask) {
+fixed4 Texture2DAdvancedBlur3x3(sampler2D tex, half2 texCoord, half2 blur, half4 mask) {
     const int KernalSize = 5;
     const float Kernal[5] = { 0.2486, 0.7046, 1.0, 0.7046, 0.2486};
     
@@ -22,7 +22,7 @@ fixed4 Texture2DAdvancedBlur3x3(sampler2D texture, half2 texCoord, half2 blur, h
 	}
 	return o / sum;
 }
-
+/*
 fixed4 Texture2DAdvancedBlur5x5(sampler2D texture, half2 texCoord, half2 blur, half4 mask) {
 
     const int KernalSize = 9;
@@ -93,8 +93,8 @@ fixed4 Texture2DBlur3x3(sampler2D texture, half2 texCoord, half2 blur) {
 	
 	return o / sum;
 }
-
-fixed4 Texture2DBlur5x5(sampler2D texture, half2 texCoord, half2 blur) {
+*/
+fixed4 Texture2DBlur5x5(sampler2D tex, half2 texCoord, half2 blur) {
 
     const int KernalSize = 5;
     const float Kernal[5] = { 0.2486, 0.7046, 1.0, 0.7046, 0.2486};
@@ -117,7 +117,8 @@ fixed4 Texture2DBlur5x5(sampler2D texture, half2 texCoord, half2 blur) {
 	return o / sum;
 }
 
-fixed4 Texture2DBlur7x7(sampler2D texture, half2 texCoord, half2 blur) {
+
+fixed4 Texture2DBlur7x7(sampler2D tex, half2 texCoord, half2 blur) {
 
     const int KernalSize = 7;
     const float Kernal[7] = { 0.1719, 0.4566, 0.8204, 1.0, 0.8204, 0.4566, 0.1719};
@@ -139,6 +140,8 @@ fixed4 Texture2DBlur7x7(sampler2D texture, half2 texCoord, half2 blur) {
 	
 	return o / sum;
 }
+
+/*
 
 /*fixed4 Tex2DBlurring1D (sampler2D tex, half2 uv, half2 blur) {
     const int KernalSize = 3;
@@ -195,6 +198,7 @@ fixed4 Tex2DBlurring1D (sampler2D tex, half2 uv, half2 blur) {
 		sum += weight;
 	}
 	return o / sum;
-}*/
+}
+*/
 
-#endif INCLUDE_VERTIGO_BLUR
+#endif //INCLUDE_VERTIGO_BLUR

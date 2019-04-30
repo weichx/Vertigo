@@ -51,13 +51,12 @@ namespace Vertigo {
             }
         }
 
-        private static void CreateRectFillGeometry(ShapeBatch shapeBatch, in Shape shape, LightList<Vector3> shapeData) {
+        private static void CreateRectFillGeometry(ShapeBatch shapeBatch, in Shape shape, StructList<Vector3> shapeData) {
             Vertex v0 = new Vertex();
             Vertex v1 = new Vertex();
             Vertex v2 = new Vertex();
             Vertex v3 = new Vertex();
 
-            const int fill = 1;
 
             int start = shape.pointRange.start;
 
@@ -69,16 +68,12 @@ namespace Vertigo {
             v0.position.z = 10;
             v0.texCoord0.x = 0;
             v0.texCoord0.y = 1;
-            v0.texCoord0.z = (int) ShapeType.Rect;
-            v0.texCoord0.w = fill;
 
             v1.position.x = position.x + size.x;
             v1.position.y = -position.y;
             v1.position.z = 10;
             v1.texCoord0.x = 1;
             v1.texCoord0.y = 1;
-            v1.texCoord0.z = (int) ShapeType.Rect;
-            v1.texCoord0.w = fill;
 
             v2.position.x = position.x + size.x;
             v2.position.y = -position.y - size.y;
@@ -86,16 +81,12 @@ namespace Vertigo {
 
             v2.texCoord0.x = 1;
             v2.texCoord0.y = 0;
-            v2.texCoord0.z = (int) ShapeType.Rect;
-            v2.texCoord0.w = fill;
 
             v3.position.x = position.x;
             v3.position.y = -position.y - size.y;
             v3.position.z = 10;
             v3.texCoord0.x = 0;
             v3.texCoord0.y = 0;
-            v3.texCoord0.z = (int) ShapeType.Rect;
-            v3.texCoord0.w = fill;
 
             ShapeMeshData data = new ShapeMeshData();
             data.isSDF = false;
@@ -109,7 +100,7 @@ namespace Vertigo {
             shapeBatch.AddShapeMeshData(data);
         }
 
-        private static void CreateCircleFillGeometry(ShapeBatch shapeBatch, in Shape shape, LightList<Vector3> shapeData) {
+        private static void CreateCircleFillGeometry(ShapeBatch shapeBatch, in Shape shape, StructList<Vector3> shapeData) {
             // todo -- even in the sdf case we can 'clip' the corners of the rect by some amount to get a better fit
 
             Vertex v0 = new Vertex();
@@ -158,7 +149,7 @@ namespace Vertigo {
             shapeBatch.AddShapeMeshData(data);
         }
 
-        public static void CreateFillGeometry(ShapeBatch output, in Shape shape, LightList<Vector3> shapeData) {
+        public static void CreateFillGeometry(ShapeBatch output, in Shape shape, StructList<Vector3> shapeData) {
             switch (shape.type) {
 
                 case ShapeType.Rect:
@@ -186,7 +177,7 @@ namespace Vertigo {
 
         }
 
-        public static void CreateFillGeometry(ShapeBatch output, RangeInt shapeRange, LightList<Shape> shapeList, LightList<Vector3> shapeData) {
+        public static void CreateFillGeometry(ShapeBatch output, RangeInt shapeRange, StructList<Shape> shapeList, StructList<Vector3> shapeData) {
             int start = shapeRange.start;
             int end = shapeRange.end;
 
@@ -198,7 +189,7 @@ namespace Vertigo {
 
         }
 
-        public static void CreateStrokeGeometry(ShapeBatch shapeBatch, RangeInt drawCallShapeRange, LightList<Shape> shapes, LightList<Vector3> shapeData) {
+        public static void CreateStrokeGeometry(ShapeBatch shapeBatch, RangeInt drawCallShapeRange, StructList<Shape> shapes, StructList<Vector3> shapeData) {
             throw new NotImplementedException();
         }
 

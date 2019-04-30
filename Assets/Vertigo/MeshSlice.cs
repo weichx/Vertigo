@@ -8,6 +8,8 @@ namespace Vertigo {
 
         internal ShapeBatch batch;
 
+        public readonly ShapeType type;
+        public readonly Rect bounds;
         public readonly int vertexCount;
         public readonly int triangleCount;
 
@@ -15,10 +17,12 @@ namespace Vertigo {
         internal readonly int triangleStart;
 
         internal MeshSlice(ShapeBatch batch, int shapeIdx) {
-            this.batch = batch;
-            
-            MeshRange meshRange = batch.shapeList.Array[shapeIdx].meshRange;
+            ShapeMeshData[] array = batch.shapeList.Array;
+            MeshRange meshRange = array[shapeIdx].meshRange;
 
+            this.batch = batch;
+            this.bounds = array[shapeIdx].bounds;
+            this.type = array[shapeIdx].shapeType;
             this.vertexCount = meshRange.vertexRange.length;
             this.triangleCount = meshRange.triangleRange.length;
             this.vertexStart = meshRange.vertexRange.start;
@@ -159,7 +163,18 @@ namespace Vertigo {
         }
 
         public void FillShapeBuffer(ShapeMeshBuffer buffer, VertexChannel channels = VertexChannel.All) {
-            if (channels == 0) return;
+            if (channels == 0) {
+                buffer.EnsureCapacity(vertexCount, triangleCount);
+
+                buffer.colorList.Count = vertexCount;
+                buffer.normalList.Count = vertexCount;
+                buffer.positionList.Count = vertexCount;
+                buffer.texCoord0List.Count = vertexCount;
+                buffer.texCoord1List.Count = vertexCount;
+                buffer.texCoord2List.Count = vertexCount;
+                buffer.triangleList.Count = triangleCount;
+                return;
+            }
 
             buffer.EnsureCapacity(vertexCount, triangleCount);
 
@@ -215,7 +230,7 @@ namespace Vertigo {
             buffer.texCoord1List.Count = vertexCount;
             buffer.texCoord2List.Count = vertexCount;
             buffer.triangleList.Count = triangleCount;
-            
+
             Array.Copy(batch.initialTriangles.Array, triangleStart, buffer.triangleList.Array, 0, triangleCount);
             buffer.triangleList.Count = triangleCount;
         }

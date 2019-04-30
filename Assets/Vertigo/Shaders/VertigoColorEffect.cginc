@@ -52,19 +52,20 @@ fixed4 ApplyFillColorEffect(fixed4 color, fixed4 factor, int cutoff = 0) {
     return color;
 }
 
-fixed4 ApplyColorEffect(int effectType, half4 color, half4 factor, int cutoff = 0) {
+fixed4 ApplyColorEffect(int effectType, half4 color, half4 factor, fixed cutoff = 0) {
     
-    fixed4 fill = color.rgb = lerp(color.rgb, factor.rgb, factor.a);
-    fixed4 add =  color.rgb + factor.rgb * factor.a;
-    fixed4 sub = color.rgb - factor.rgb * factor.a;
-    fixed4 none = lerp(color.rgb, color.rgb * factor.rgb, factor.a);
+    fixed3 fill = color.rgb = lerp(color.rgb, factor.rgb, factor.a);
+    fixed3 add =  color.rgb + factor.rgb * factor.a;
+    fixed3 sub = color.rgb - factor.rgb * factor.a;
+    fixed3 none = lerp(color.rgb, color.rgb * factor.rgb, factor.a);
     
-    fixed4 retn = lerp(none, fill, effectType == 1);
+    fixed3 retn = lerp(none, fill, effectType == 1);
     retn = lerp(retn, add, effectType == 2);
     retn = lerp(retn, sub, effectType == 3);
 
-    retn.a = lerp(retn.a, factor.a, cutoff);
-	return retn;
+    color.rgb = retn;
+    color.a = lerp(color.a, factor.a, cutoff);
+	return color;
 }
 
 #endif // VERTIGO_EFFECT_COLOR

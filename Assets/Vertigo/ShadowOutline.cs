@@ -1,88 +1,94 @@
 using System.Collections.Generic;
-using Unity.Mathematics;
+using System.Runtime.InteropServices;
 using UnityEngine;
+using Vertigo;
 
-namespace Vertigo {
-
-    public enum VertigoEffectFeature {
-
-        SdfRendering,
-        GPULines,
-        ParameterTexture
-        
-    }
-
-    // ctx.Fill(effect, effectData, shapes):
-    // effect.data.y = x;
-    // render;
-    
-    // effect.material = material;
-
-    public struct RenderState {
-
-        public Color strokeColor;
-        public Color fillColor;
-        
-        public float strokeWidth;
-        public float strokeOpacity;
-        public float fillOpacity;
-        
-        public Texture2D texture0;
-        public Texture2D texture1;
-        public Texture2D texture2;
-        public StrokePlacement strokePlacement;
-        public ColorMode strokeColorMode;
-        
-        public RenderSettings renderSettings;
-
-    }
-    
-    // effects must be the same to batched
-    // effect data is per-shape, no notion of that per batch
-    // data might set textures though
-
-    // ctx.AddEffect();
-    // ctx.RegisterEffect(effect);
-    
-    //ctx.Stroke(effect, shape);
-    
-    public struct VertigoState {
-
-        public float3x2 transform;
-        public Rect scissorRect;
-        public RenderState renderState;
-        public RenderSettings renderSettings;
-
-    }
+namespace Effect {
 
     public class ShadowOutline : VertigoEffect<ShadowData> {
-        
+
         private readonly ShapeMeshBuffer buffer = new ShapeMeshBuffer();
+        private static readonly int _MainTex = Shader.PropertyToID("_MainTex");
 
         public ShadowOutline(Material material) : base(material) { }
-        
-        public bool CanBatch(List<ShapeBatch> batches, in ShadowData testBatch) {
+
+        public bool CanRunWithKeywords(List<string> keywords, ShapeBatch batch, in ShadowData data) {
             return false;
         }
 
         public override Material GetMaterialToDraw(int drawCallId, in VertigoState state, ShapeBatch shapeBatch, MaterialPropertyBlock block) {
-            block.SetTexture("_MainTex", state.renderState.texture0);
+            block.SetTexture(_MainTex, state.renderState.texture0);
+            
+            material.EnableKeyword("TONE_SEPIA");
+            material.EnableKeyword("BLUR_7x7");
+            material.EnableKeyword("GRADIENT");
+            
             return base.GetMaterialToDraw(drawCallId, in state, shapeBatch, block);
         }
 
-        protected override void ModifyShapeMesh(ShapeBatch shapeBatch, in ShadowData data, in MeshSlice slice, in Shape shape) {
-            slice.FillShapeBuffer(buffer, VertexChannel.Position | VertexChannel.Color | VertexChannel.TexCoord0);
+        [StructLayout(LayoutKind.Explicit)]
+        public struct Union {
+
+            [FieldOffset(0)] public float asFloat;
+            [FieldOffset(0)] public int asInt;
+
+        }
+
+        public float ColorToFloat(Color c) {
+            int color = (int) (c.r * 255) | (int) (c.g * 255) << 8 | (int) (c.b * 255) << 16 | (int) (c.a * 255) << 24;
+
+            Union color2Float;
+            color2Float.asFloat = 0;
+            color2Float.asInt = color;
+
+            return color2Float.asFloat;
+        }
+        
+        protected override void Apply(ShapeBatch shapeBatch, in VertigoState state, in ShadowData data, in MeshSlice slice) {
+
+          //  shapeBatch.AddMeshData(slice, material, materialPropertyBlock);
+            
+            if (data.shadows != null) {
+                
+                for (int i = 0; i < data.shadows.Length; i++) {
                     
-            int vertexCount = buffer.vertexCount;
-            Vector3[] vertices = buffer.positionList.Array;
+                    slice.FillShapeBuffer(buffer, VertexChannel.Position | VertexChannel.Color | VertexChannel.TexCoord0 | VertexChannel.TexCoord1);
+                    
+                    if (i < data.shadows.Length) {
+                        Vector2 offset = data.shadows[i].offset;
+                        Color color = data.shadows[i].color;
+                        float blur = data.shadows[i].blur;
 
-            for (int i = 0; i < vertexCount; i++) {
-                vertices[i].x += data.offset.x;
-                vertices[i].y += data.offset.y;
-                vertices[i].z += 1;
+                        int vertexCount = buffer.vertexCount;
+                        Vector3[] vertices = buffer.positionList.Array;
+                        Vector4[] textureCoords0 = buffer.texCoord0List.Array;
+                        Vector4[] textureCoords1 = buffer.texCoord0List.Array;
+
+                       // color.r = blur;
+                        
+                        int parameterIndex = shapeBatch.SetParameter(color);
+
+                        const int shouldBlur = 1;
+                        
+                        for (int j = 0; j < vertexCount; j++) {
+                            vertices[j].x += offset.x;
+                            vertices[j].y += offset.y;
+                            textureCoords0[j].z = ColorToFloat(color);
+                            textureCoords0[j].w = blur;
+//                            textureCoords1[j].x = ColorToFloat(color);
+//                            textureCoords1[j].y = blur;
+                        }
+
+                        shapeBatch.AddMeshData(buffer);
+                    }
+                    else {
+                        
+                    }
+                }
             }
+            
+            //slice.FillShapeBuffer(buffer, VertexChannel.Position | VertexChannel.Color | VertexChannel.TexCoord0 | VertexChannel.TexCoord1);
 
-            shapeBatch.AddMeshData(buffer);
             shapeBatch.AddMeshData(slice);
 
         }

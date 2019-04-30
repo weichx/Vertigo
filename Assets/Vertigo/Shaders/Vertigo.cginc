@@ -48,7 +48,7 @@ half2 UnpackToVec2(float value) {
 }
 
 float4 UnpackColor(uint input) {
-    return float4(
+    return fixed4(
         uint((input >> 0) & 0xff) / float(0xff),
         uint((input >> 8) & 0xff) / float(0xff),
         uint((input >> 16) & 0xff) / float(0xff),
@@ -194,36 +194,6 @@ fixed4 ApplyColorEffect(half4 color, half4 factor)  {
 
 	#if CUTOFF
 	    color.a = factor.a;
-	#endif
-
-	return color;
-}
-
-// Apply transition effect.
-fixed4 ApplyTransitionEffect(half4 color, half3 transParam) {
-	fixed4 param = tex2D(_ParamTex, float2(0.25, transParam.z));
-	float alpha = tex2D(_NoiseTex, transParam.xy).a;
-	
-	#if REVERSE
-        fixed effectFactor = 1 - param.x;
-	#else
-        fixed effectFactor = param.x;
-	#endif
-	
-	#if FADE
-	    color.a *= saturate(alpha + (1 - effectFactor * 2));
-	    
-	#elif CUTOFF
-	    color.a *= step(0.001, color.a * alpha - effectFactor);
-	    
-	#elif DISSOLVE
-        fixed width = param.y/4;
-        fixed softness = param.z;
-        fixed3 dissolveColor = tex2D(_ParamTex, float2(0.75, transParam.z)).rgb;
-        float factor = alpha - effectFactor * ( 1 + width ) + width;
-        fixed edgeLerp = step(factor, color.a) * saturate((width - factor)*16/ softness);
-        color = ApplyColorEffect(color, fixed4(dissolveColor, edgeLerp));
-        color.a *= saturate((factor)*32/ softness);
 	#endif
 
 	return color;

@@ -17,7 +17,7 @@ namespace Vertigo {
         public static readonly int shaderKey_ZWrite;
         public static readonly int shaderKey_BlendArgSrc;
         public static readonly int shaderKey_BlendArgDst;
-        
+
         private static Material s_DefaultMaterial;
 
         static VertigoEffect() {
@@ -33,7 +33,7 @@ namespace Vertigo {
             shaderKey_BlendArgSrc = Shader.PropertyToID("_SrcBlend ");
             shaderKey_BlendArgDst = Shader.PropertyToID("_DstBlend ");
         }
-        
+
         public static VertigoEffect Default { get; set; }
 
         protected VertigoEffect(Material material) {
@@ -44,7 +44,7 @@ namespace Vertigo {
             UpdateRenderSettings(state, block);
             return material;
         }
-        
+
         public virtual void ReleaseMaterial(int drawCallId, Material material) { }
 
         public static Material DefaultMaterial {
@@ -65,7 +65,6 @@ namespace Vertigo {
         public abstract void ClearState();
 
         protected static void UpdateRenderSettings(in VertigoState state, MaterialPropertyBlock block) {
-
 //            block.SetInt(shaderKey_StencilRef, state.renderSettings.stencilRefValue);
 //            block.SetInt(shaderKey_StencilReadMask, state.renderSettings.stencilReadMask);
 //            block.SetInt(shaderKey_StencilWriteMask, state.renderSettings.stencilWriteMask);
@@ -77,30 +76,33 @@ namespace Vertigo {
 //            block.SetInt(shaderKey_ZWrite, state.renderSettings.zWrite ? 1 : 0);
 //            block.SetInt(shaderKey_BlendArgSrc, (int) state.renderSettings.blendArgSrc);
 //            block.SetInt(shaderKey_BlendArgDst, (int) state.renderSettings.blendArgDst);
-
         }
+
+        internal abstract void Apply(ShapeBatch shapeBatch, MeshSlice slice, VertigoState state, int effectDataIndex);
 
     }
 
     public abstract class VertigoEffect<T> : VertigoEffect where T : struct {
 
         public T data;
-        private readonly LightList<T> stateBuffer;
+        private readonly StructList<T> stateBuffer;
 
         protected VertigoEffect(Material material) : base(material) {
-            stateBuffer = new LightList<T>();
+            stateBuffer = new StructList<T>();
         }
 
-        internal override void ModifyShapeMesh(ShapeBatch batch, int stateId, in MeshSlice meshSlice, in Shape shape) {
-            T state = default;
-            if (stateId >= 0 && stateId <= stateBuffer.Count) {
-                state = stateBuffer.Array[stateId];
+        internal override void Apply(ShapeBatch shapeBatch, MeshSlice slice, VertigoState state, int effectDataIndex) {
+            T effectData = default;
+            if (effectDataIndex >= 0 && effectDataIndex <= stateBuffer.Count) {
+                effectData = stateBuffer.Array[effectDataIndex];
             }
 
-            ModifyShapeMesh(batch, state, meshSlice, shape);
+            Apply(shapeBatch, state, effectData, slice);
         }
 
-        protected virtual void ModifyShapeMesh(ShapeBatch batch, in T data, in MeshSlice meshSlice, in Shape shape) { }
+        protected virtual void Apply(ShapeBatch batch, in VertigoState state, in T data, in MeshSlice meshSlice) {
+            batch.AddMeshData(meshSlice);
+        }
 
         public override int StoreState(int contextId) {
             stateBuffer.Add(data);

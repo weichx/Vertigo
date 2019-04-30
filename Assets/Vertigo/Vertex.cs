@@ -6,6 +6,7 @@ namespace Vertigo {
     [Flags]
     public enum VertexChannel {
 
+        None = 0,
         Position = 1 << 0,
         Normal = 1 << 1,
         TexCoord0 = 1 << 2,

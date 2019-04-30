@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace Vertigo {
 
+    // todo -- replace w/ StructList<T>
     internal struct ArrayView<T> where T : struct {
 
         internal int size;
@@ -20,6 +21,8 @@ namespace Vertigo {
 
         internal readonly Mesh mesh;
 
+        internal ParameterTexture parameterTexture;
+        
         // todo could compress the lists by using a cut off point, after item x the final list begins
         // keeping the lists separate makes for better copy operations
         // could also move the final lists to another object, lets see if this becomes a problem
@@ -108,7 +111,7 @@ namespace Vertigo {
             int[] tris = triangleOutput.array;
             int size = triangleOutput.size;
             int startSize = positionOutput.size - vertexCount;
-            
+
             for (int i = start; i < end; i++) {
                 tris[size++] = startSize + initialTriangles.Array[i];
             }
@@ -127,25 +130,24 @@ namespace Vertigo {
             AddRangeUnsafe(ref texCoordOutput1, buffer.texCoord1List.Array, vertexCount);
             AddRangeUnsafe(ref texCoordOutput2, buffer.texCoord2List.Array, vertexCount);
             AddRangeUnsafe(ref colorOutput, buffer.colorList.Array, vertexCount);
-            AddRangeUnsafe(ref triangleOutput, buffer.triangleList.Array, triangleCount);
-            // todo -- handle triangles properly
-            
-//            int start = slice.triangleStart;
-//            int end = start + slice.triangleCount;
-//
-//            int[] tris = triangleOutput.array;
-//            int size = triangleOutput.size;
-//            int startSize = positionOutput.size - vertexCount;
-//            for (int i = start; i < end; i++) {
-//                tris[size++] = startSize + initialTriangles.Array[i];
-//            }
-//
-//            triangleOutput.size += end - start;
+
+            int start = 0;
+            int end = triangleCount;
+
+            int[] tris = triangleOutput.array;
+            int size = triangleOutput.size;
+            int startSize = positionOutput.size - vertexCount;
+            for (int i = start; i < end; i++) {
+                tris[size++] = startSize + buffer.triangleList.Array[i];
+            }
+
+            triangleOutput.size += end - start;
         }
 
         internal void Clear() {
             triangleIndex = 0;
             mesh.Clear(true);
+            parameterTexture = null;
             // todo when this is stable just set count to 0, old data is safe to overwrite
             shapeList.QuickClear();
 
@@ -173,7 +175,6 @@ namespace Vertigo {
             texCoordOutput2.size = 0;
             colorOutput.size = 0;
             triangleOutput.size = 0;
-            
         }
 
         private static void AddRange<T>(ref ArrayView<T> target, T[] source, int count) where T : struct {
@@ -318,6 +319,10 @@ namespace Vertigo {
             mesh.SetTriangles(finalTriangleList, 0);
             return mesh;
         }
+        
+        public int SetParameter(Color32 color) {
+            return parameterTexture.SetParameter(color);
+        }
 
         internal class ShapeBatchPool {
 
@@ -333,7 +338,7 @@ namespace Vertigo {
                 this.releaseQueue = new LightList<ShapeBatch>();
             }
 
-            public ShapeBatch Get() {
+            public ShapeBatch Get(ParameterTexture parameterTexture) {
                 ShapeBatch retn = null;
                 if (available.Count == 0) {
                     retn = new ShapeBatch();
@@ -342,20 +347,28 @@ namespace Vertigo {
                     retn = available.RemoveLast();
                 }
 
+                retn.parameterTexture = parameterTexture;
                 releaseQueue.Add(retn);
                 return retn;
             }
 
-            public void Release() {
+            public void Release(ShapeBatch batch) {
+                releaseQueue.Add(batch);
+            }
+
+            public void ReleaseAll() {
                 for (int i = 0; i < releaseQueue.Count; i++) {
                     releaseQueue[i].Clear();
                 }
-                
+
                 available.AddRange(releaseQueue);
                 releaseQueue.QuickClear();
             }
 
         }
+
+      
+
     }
 
 }

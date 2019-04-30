@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ContentModelStore">
+    <e p="C:\Seed\Vertigo\Vertigo" t="IncludeFlat">
+      <e p="Vertigo.sln" t="IncludeFlat" />
+    </e>
+    <e p="C:\Users\Matt\.Rider2019.1\config\extensions" t="IncludeRecursive" />
+    <e p="C:\Users\Matt\.Rider2019.1\system\extResources" t="IncludeRecursive" />
+    <e p="C:\Users\Matt\.Rider2019.1\system\resharper-host\local\Transient\ReSharperHost\v191\SolutionCaches\_Vertigo.959010422.00" t="ExcludeRecursive" />
+  </component>
+</project>

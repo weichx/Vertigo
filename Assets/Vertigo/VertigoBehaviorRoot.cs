@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using Effect;
+using UnityEngine;
 using UnityEngine.Rendering;
 using Vertigo;
 
@@ -11,6 +12,8 @@ public class VertigoBehaviorRoot : MonoBehaviour {
 
     public ShadowOutline shadowOutline;
 
+    public ShadowData shadowData;
+    
     private bool didStart = false;
 
     public Vector2 shadowOffset = new Vector2(20, 20);
@@ -38,8 +41,7 @@ public class VertigoBehaviorRoot : MonoBehaviour {
         ctx.ClosePath();
         ctx.SetFill(Color.red);
         ctx.SetTexture(texture, 0);
-        shadowOutline.data.color = Color.green;
-        shadowOutline.data.offset = shadowOffset;
+        shadowOutline.data = shadowData;
         ctx.Fill(shadowOutline);
         ctx.Render(camera);
         ctx.Clear();

@@ -23,10 +23,15 @@
             #pragma fragment frag
 
             #include "UnityCG.cginc"
+            #include "./Vertigo.cginc"
+            #include "./VertigoBlur.cginc"
+            #include "./VertigoColorEffect.cginc"
 
             float4 _MainTex_ST;
             sampler2D _MainTex;
             sampler2D _ParameterTex;
+            fixed4 _Color;
+            
             // Base Effect
             //  effect factor [0, 1]
             //  color factor = [0, 1]
@@ -81,6 +86,13 @@
             
             #define VERTIGO_TRANSFORM_TEX(tex,name) (tex.xy * name##_ST.xy + name##_ST.zw)
 
+            
+            sampler2D _VertigoParameterTexture;
+            int _VertigoParameterTexture_Width;
+            int _VertigoParameterTexture_Height;
+            float4 _MainTex_TexelSize;
+            fixed4 _TextureSampleAdd;
+            
             struct AppData {
                 float4 vertex : POSITION;
                 float4 uv : TEXCOORD0;
@@ -93,31 +105,31 @@
             struct v2f {
                 float4 uv : TEXCOORD0;
                 float4 vertex : SV_POSITION;
+                fixed4 color : COLOR;
+                float4 effectParams :TEXCOORD1; 
             };
 
             v2f vert (AppData v) {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.uv.xy = TRANSFORM_TEX(v.uv.xy, _MainTex);
+                fixed4 color = UnpackColor(asuint(v.uv.z));
+                
+                o.color = color;
+                o.effectParams = v.uv.w;
                 return o;
             }
 
             fixed4 frag (v2f i) : SV_Target {
                 
-//                VertigoPixelize();
-//                
-//                VertigoTone(i.toneSettings);
-//                
-//                VertigoHueShift(i.hueSettings);
-//                
-//                #if VERTIGO_BLUR
-//                    VertigoBlur();
-//                #endif
-//                
-//                
-//                VertigoSoftMask();
+                half2 blur = i.effectParams.xy * _MainTex_TexelSize.xy * 2;
+                fixed4 c = Texture2DBlur7x7(_MainTex, i.uv.xy, blur);
+                c += + _TextureSampleAdd;
+                c.rgb = i.color.rgb;
+                c = ApplyFillColorEffect(c, fixed4(i.color.rgb, 1), 0.5);
+               // c.a *= i.color.a;
                 
-                return tex2D(_MainTex, i.uv.xy);
+                return c;
             }
             ENDCG
         }
