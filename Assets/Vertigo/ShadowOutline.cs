@@ -63,8 +63,6 @@ namespace Effect {
                         Vector3[] vertices = buffer.positionList.Array;
                         Vector4[] textureCoords0 = buffer.texCoord0List.Array;
                         Vector4[] textureCoords1 = buffer.texCoord0List.Array;
-
-                       // color.r = blur;
                         
                         int parameterIndex = shapeBatch.SetParameter(color);
 

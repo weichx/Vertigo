@@ -52,7 +52,6 @@
             //  color mode = enum
             //  noise texture = sampler2D
             //  reversed = bool
-            //  effect area [rect, fit, Character]
             // HSV
             //   target color
             //   shift range [0, 1]
@@ -123,10 +122,16 @@
             fixed4 frag (v2f i) : SV_Target {
                 
                 half2 blur = i.effectParams.xy * _MainTex_TexelSize.xy * 2;
+            #if VERTIGO_FEATURE_BLUR
                 fixed4 c = Texture2DBlur7x7(_MainTex, i.uv.xy, blur);
                 c += + _TextureSampleAdd;
+            #endif
                 c.rgb = i.color.rgb;
+                
+            #if VERTIGO_FEATURE__COLOR_EFFECT
                 c = ApplyFillColorEffect(c, fixed4(i.color.rgb, 1), 0.5);
+            #endif
+                
                // c.a *= i.color.a;
                 
                 return c;
