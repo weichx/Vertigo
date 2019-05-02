@@ -48,7 +48,7 @@
             fixed4 frag (v2f i) : SV_Target {
                 fixed4 col = tex2D(_MainTex, i.texCoord0.xy);
 //                return col;
-                return col;
+//                return col;
                 return fixed4(1, 0, 0, 1);
             }
             ENDCG

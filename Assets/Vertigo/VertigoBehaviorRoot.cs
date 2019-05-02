@@ -36,11 +36,11 @@ public class VertigoBehaviorRoot : MonoBehaviour {
         ctx2.Clear();
         shapeGen = new ShapeGenerator();
         
-        shapeGen.BeginPath();
-        shapeGen.MoveTo(300, 300);
-        shapeGen.LineTo(300, 400);
-        shapeGen.LineTo(300, 500);
-        shapeGen.LineTo(200, 200);
+        shapeGen.BeginPath(0, 0);
+        shapeGen.LineTo(100, 0);
+        shapeGen.LineTo(100, 100);
+        shapeGen.LineTo(0, 100);
+        shapeGen.LineTo(50, 50);
         shapeGen.ClosePath();
         
 //        shapeGen.Ellipse(0, 0, width, height, segmentCount);

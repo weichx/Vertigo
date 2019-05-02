@@ -17,33 +17,42 @@ namespace Vertigo {
             this.points = new StructList<PathPoint>(capacity * 8);
         }
 
-        public void MoveTo(float x, float y) {
-            if (!buildingPath) {
-                return;
-            }
-            lastPoint.x = x;
-            lastPoint.y = y;
-            // todo - check this isn't duplicated
-            
-        }
+//        public void MoveTo(float x, float y) {
+//            if (!buildingPath) {
+//                return;
+//            }
+//            lastPoint.x = x;
+//            lastPoint.y = y;
+//            points.Add(new PathPoint(x, y, PointFlag.Corner));
+//            // todo - check this isn't duplicated
+//            currentPath.pointRange.length++;
+//
+//        }
 
         public void LineTo(float x, float y) {
             points.Add(new PathPoint(x, y, PointFlag.Corner));
+            currentPath.pointRange.length++;
         }
 
-        public void BeginPath() {
+        public void BeginPath(float x, float y) {
             if (buildingPath) {
                 // delete old path if it hasn't ended
             }
             currentPath = new PathDef();
+            currentPath.pointRange.start = points.Count;
+            currentPath.pointRange.length++;
+            points.Add(new PathPoint(x, y, PointFlag.Corner));
             buildingPath = true;
         }
 
         public void ClosePath() {
             buildingPath = false;
             currentPath.isClosed = true;
+            currentPath.pointRange.length++;
+            points.Add(points[currentPath.pointRange.start]);
             ShapeDef shapeDef = new ShapeDef(ShapeType.ClosedPath);
             shapeDef.pathDef = currentPath;
+            
             shapes.Add(shapeDef);
             currentPath = default;
         }

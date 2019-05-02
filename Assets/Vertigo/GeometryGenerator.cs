@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -7,6 +8,9 @@ namespace Vertigo {
     public class GeometryGenerator {
 
         private RenderState renderState;
+        private readonly LightList<int> s_IntScratch0 = new LightList<int>(32);
+        private readonly LightList<int> s_IntScratch1 = new LightList<int>(32);
+        private readonly LightList<float> s_FloatScratch = new LightList<float>(32);
 
         public GeometryGenerator() {
             this.renderState.strokeWidth = 1f;
@@ -244,26 +248,48 @@ namespace Vertigo {
 
                     case ShapeType.ClosedPath: {
                         ShapeGenerator.PathDef pathDef = shape.pathDef;
-                        if (pathDef.hasHoles) {
-                            
-                        }
+                        if (pathDef.hasHoles) { }
 
                         int start = pathDef.pointRange.start;
                         int end = pathDef.pointRange.end;
-                        
+
+                        int vertexStart = retn.vertexCount;
+                        int triangleStart = retn.triangleCount;
+
                         ShapeGenerator.PathPoint[] points = shapeGenerator.points.array;
-                        LightList<float> floats = new LightList<float>();
+
+                        s_FloatScratch.EnsureCapacity(end - start);
                         
                         for (int j = start; j < end; j++) {
                             Vector2 position = points[j].position;
-                            floats.Add(position.x);
-                            floats.Add(position.y);
+                            s_FloatScratch.AddUnchecked(position.x);
+                            s_FloatScratch.AddUnchecked(-position.y);
+                            retn.positions.Add(new Vector3(position.x, -position.y));
                         }
 
-                        LightList<int> output = new LightList<int>();
-                        
-                        Earcut.Tessellate(floats, null, output);
+                        long before = GC.GetTotalMemory(false);
+                        Earcut.Tessellate(s_FloatScratch, s_IntScratch0, s_IntScratch1);
+                        long after = GC.GetTotalMemory(false);
 
+                        Debug.Log(after - before);
+                        
+                        int count = s_IntScratch1.Count;
+                        int[] tessellatedIndices = s_IntScratch1.Array;
+
+                        for (int j = 0; j < count; j++) {
+                            retn.triangles.Add(tessellatedIndices[j]);
+                        }
+
+                        s_IntScratch0.Count = 0;
+                        s_IntScratch1.Count = 0;
+                        s_FloatScratch.Count = 0;
+                        
+                        retn.shapes.Add(new GeometryShape() {
+                            vertexStart = vertexStart,
+                            vertexCount = retn.vertexCount - vertexStart,
+                            triangleStart = triangleStart,
+                            triangleCount = retn.triangleCount - triangleStart
+                        });
                         break;
                     }
 
@@ -281,17 +307,17 @@ namespace Vertigo {
                         float maxX = shape.bounds.xMax;
                         float minY = shape.bounds.yMin;
                         float maxY = shape.bounds.yMax;
-                        
+
                         Vector4 uv0 = new Vector4(
                             PercentOfRange(p0.x, minX, maxX),
                             1 - PercentOfRange(p0.y, minY, maxY)
                         );
-                        
+
                         Vector4 uv1 = new Vector4(
                             PercentOfRange(p1.x, minX, maxX),
                             1 - PercentOfRange(p1.y, minY, maxY)
                         );
-                        
+
                         Vector4 uv2 = new Vector4(
                             PercentOfRange(p2.x, minX, maxX),
                             1 - PercentOfRange(p2.y, minY, maxY)
@@ -346,7 +372,7 @@ namespace Vertigo {
                         break;
                     case ShapeType.Unset:
                         break;
-                  
+
                     default:
                         throw new ArgumentOutOfRangeException();
                 }

@@ -1,96 +1,51 @@
-using System.Diagnostics;
+using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace Vertigo {
 
-    using System;
-    using System.Collections.Generic;
-
-
     // Adapted from https://github.com/oberbichler/earcut.net/blob/master/src/Earcut.cs
     // which is a port of https://github.com/mapbox/earcut/blob/master/src/earcut.js
-
-    public class ObjectPool<T> where T : class, new() {
-
-        private readonly Stack<T> m_Stack;
-        private readonly Action<T> m_ActionOnGet;
-        private readonly Action<T> m_ActionOnRelease;
-
-        [DebuggerStepThrough]
-        public ObjectPool(Action<T> actionOnGet = null, Action<T> actionOnRelease = null) {
-            this.m_ActionOnGet = actionOnGet;
-            this.m_ActionOnRelease = actionOnRelease;
-            this.m_Stack = new Stack<T>();
-        }
-
-        public int TotalCount { get; private set; }
-
-        public int ActiveCount => TotalCount - InactiveCount;
-
-        public int InactiveCount => m_Stack.Count;
-
-        public T Get() {
-            T element;
-            if (m_Stack.Count == 0) {
-                element = new T();
-                TotalCount++;
-            }
-            else {
-                element = m_Stack.Pop();
-            }
-
-            m_ActionOnGet?.Invoke(element);
-            return element;
-        }
-
-        public void Release(T element) {
-            if (m_Stack.Count > 0 && ReferenceEquals(m_Stack.Peek(), element)) {
-                UnityEngine.Debug.LogError("Internal error. Trying to destroy object that is already released to pool.");
-            }
-
-            m_ActionOnRelease?.Invoke(element);
-            m_Stack.Push(element);
-        }
-
-    }
+    // my adaptations involve pooling, removing allocations, and converting types to float
 
     public static class Earcut {
 
-        private static readonly LightList<Node> holeQueue = new LightList<Node>(16);
-        private static readonly NodeComparer s_NodeXComparer = new NodeComparer();
+        private static readonly LightList<Node> inactive = new LightList<Node>(32);
+        private static readonly LightList<Node> active = new LightList<Node>(32);
+        private static readonly NodeComparer nodeComparer = new NodeComparer();
+        private static readonly LightList<Node> holeQueue = new LightList<Node>();
 
-        private static readonly ObjectPool<Node> s_NodePool = new ObjectPool<Node>(null, (p) => {
-            p.next = null;
-            p.prev = null;
-            p.prevZ = null;
-            p.nextZ = null;
-            p.z = new int?();
-            p.steiner = false;
-            p.x = 0;
-            p.y = 0;
-        });
+        private class NodeComparer : IComparer<Node> {
 
-        public static LightList<int> Tessellate(LightList<float> data, LightList<int> holeIndices, LightList<int> output = null) {
-            bool hasHoles = holeIndices != null && holeIndices.Count > 0;
-            int outerLen = hasHoles ? holeIndices[0] * 2 : data.Count;
-            Node outerNode = LinkedList(data, 0, outerLen, true);
-            output = output ?? new LightList<int>(data.Count / 2);
-
-            if (outerNode == null) {
-                return output;
+            public int Compare(Node a, Node b) {
+                return Math.Sign(a.x - b.x);
             }
 
-            var minX = float.PositiveInfinity;
-            var minY = float.PositiveInfinity;
-            var maxX = float.NegativeInfinity;
-            var maxY = float.NegativeInfinity;
-            var invSize = default(float);
+        }
+
+        public static void Tessellate(LightList<float> input, LightList<int> holeIndices, LightList<int> output) {
+            float[] data = input.Array;
+            bool hasHoles = holeIndices.Count > 0;
+            int outerLen = hasHoles ? holeIndices[0] * 2 : input.Count;
+            Node outerNode = LinkedList(data, 0, outerLen, true);
+            LightList<int> triangles = output ?? new LightList<int>();
+
+            if (outerNode == null) {
+                return;
+            }
+
+            float minX = float.PositiveInfinity;
+            float minY = float.PositiveInfinity;
+            float maxX = float.NegativeInfinity;
+            float maxY = float.NegativeInfinity;
+            float invSize = default(float);
 
             if (hasHoles) {
-                outerNode = EliminateHoles(data, holeIndices, outerNode);
+                outerNode = EliminateHoles(input, holeIndices, outerNode);
             }
 
             // if the shape is not too simple, we'll use z-order curve hash later; calculate polygon bbox
-            if (data.Count > 80 * 2) {
+            if (input.Count > 80 * 2) {
                 for (int i = 0; i < outerLen; i += 2) {
                     float x = data[i];
                     float y = data[i + 1];
@@ -117,14 +72,37 @@ namespace Vertigo {
                 invSize = invSize != 0 ? 1 / invSize : 0;
             }
 
-            EarcutLinked(outerNode, output, minX, minY, invSize, 0);
+            EarcutLinked(outerNode, triangles, minX, minY, invSize);
 
-            return output;
+            inactive.AddRange(active);
+            active.QuickClear();
+        }
+
+        private static Node Get(int i, float x, float y) {
+            Node retn = null;
+            if (inactive.Count > 0) {
+                retn = inactive.RemoveLast();
+            }
+            else {
+                retn = new Node(i, x, y);
+            }
+
+            retn.steiner = false;
+            retn.next = default;
+            retn.prev = default;
+            retn.prevZ = default;
+            retn.nextZ = default;
+            retn.z = default;
+            retn.i = i;
+            retn.x = x;
+            retn.y = y;
+            active.Add(retn);
+            return retn;
         }
 
         // Creates a circular doubly linked list from polygon points in the specified winding order.
-        private static Node LinkedList(IList<float> data, int start, int end, bool clockwise) {
-            Node last = null;
+        private static Node LinkedList(float[] data, int start, int end, bool clockwise) {
+            var last = default(Node);
 
             if (clockwise == (SignedArea(data, start, end) > 0)) {
                 for (int i = start; i < end; i += 2) {
@@ -155,7 +133,7 @@ namespace Vertigo {
                 end = start;
             }
 
-            Node p = start;
+            var p = start;
             bool again;
 
             do {
@@ -169,6 +147,7 @@ namespace Vertigo {
                     }
 
                     again = true;
+
                 }
                 else {
                     p = p.next;
@@ -179,7 +158,7 @@ namespace Vertigo {
         }
 
         // main ear slicing loop which triangulates a polygon (given as a linked list)
-        private static void EarcutLinked(Node ear, IList<int> triangles, float minX, float minY, float invSize, int pass = 0) {
+        private static void EarcutLinked(Node ear, LightList<int> triangles, float minX, float minY, float invSize, int pass = 0) {
             if (ear == null) {
                 return;
             }
@@ -189,12 +168,12 @@ namespace Vertigo {
                 IndexCurve(ear, minX, minY, invSize);
             }
 
-            Node stop = ear;
+            var stop = ear;
 
             // iterate through ears, slicing them one by one
             while (ear.prev != ear.next) {
-                Node prev = ear.prev;
-                Node next = ear.next;
+                var prev = ear.prev;
+                var next = ear.next;
 
                 if (invSize != 0 ? IsEarHashed(ear, minX, minY, invSize) : IsEar(ear)) {
                     // cut off the triangle
@@ -237,7 +216,7 @@ namespace Vertigo {
         }
 
         // check whether a polygon node forms a valid ear with adjacent nodes
-        static bool IsEar(Node ear) {
+        private static bool IsEar(Node ear) {
             var a = ear.prev;
             var b = ear;
             var c = ear.next;
@@ -261,7 +240,7 @@ namespace Vertigo {
             return true;
         }
 
-        static bool IsEarHashed(Node ear, float minX, float minY, float invSize) {
+        private static bool IsEarHashed(Node ear, float minX, float minY, float invSize) {
             var a = ear.prev;
             var b = ear;
             var c = ear.next;
@@ -328,13 +307,14 @@ namespace Vertigo {
         }
 
         // go through all polygon nodes and cure small local self-intersections
-        static Node CureLocalIntersections(Node start, IList<int> triangles) {
+        private static Node CureLocalIntersections(Node start, LightList<int> triangles) {
             var p = start;
             do {
                 var a = p.prev;
                 var b = p.next.next;
 
                 if (!Equals(a, b) && Intersects(a, p, p.next, b) && LocallyInside(a, b) && LocallyInside(b, a)) {
+
                     triangles.Add(a.i / 2);
                     triangles.Add(p.i / 2);
                     triangles.Add(b.i / 2);
@@ -353,7 +333,7 @@ namespace Vertigo {
         }
 
         // try splitting polygon into two and triangulate them independently
-        static void SplitEarcut(Node start, IList<int> triangles, float minX, float minY, float invSize) {
+        private static void SplitEarcut(Node start, LightList<int> triangles, float minX, float minY, float invSize) {
             // look for a valid diagonal that divides the polygon into two
             var a = start;
             do {
@@ -380,15 +360,15 @@ namespace Vertigo {
             } while (a != start);
         }
 
-
         // link every hole into the outer loop, producing a single-ring polygon without holes
-        private static Node EliminateHoles(IList<float> data, IList<int> holeIndices, Node outerNode) {
+        private static Node EliminateHoles(LightList<float> data, LightList<int> holeIndices, Node outerNode) {
+
             var len = holeIndices.Count;
 
             for (var i = 0; i < len; i++) {
                 var start = holeIndices[i] * 2;
                 var end = i < len - 1 ? holeIndices[i + 1] * 2 : data.Count;
-                var list = LinkedList(data, start, end, false);
+                var list = LinkedList(data.Array, start, end, false);
                 if (list == list.next) {
                     list.steiner = true;
                 }
@@ -396,7 +376,7 @@ namespace Vertigo {
                 holeQueue.Add(GetLeftmost(list));
             }
 
-            holeQueue.Sort(s_NodeXComparer);
+            holeQueue.Sort(nodeComparer);
 
             // process holes from left to right
             for (var i = 0; i < holeQueue.Count; i++) {
@@ -404,10 +384,9 @@ namespace Vertigo {
                 outerNode = FilterPoints(outerNode, outerNode.next);
             }
 
-            holeQueue.Clear();
+            holeQueue.QuickClear();
             return outerNode;
         }
-
 
         // find a bridge between vertices that connects hole with an outer ring and and link it
         private static void EliminateHole(Node hole, Node outerNode) {
@@ -472,6 +451,7 @@ namespace Vertigo {
 
             while (p != stop) {
                 if (hx >= p.x && p.x >= mx && hx != p.x && PointInTriangle(hy < my ? hx : qx, hy, mx, my, hy < my ? qx : hx, hy, p.x, p.y)) {
+
                     tan = Math.Abs(hy - p.y) / (hx - p.x); // tangential
 
                     if ((tan < tanMin || (tan == tanMin && p.x > m.x)) && LocallyInside(p, hole)) {
@@ -507,7 +487,7 @@ namespace Vertigo {
 
         // Simon Tatham's linked list merge sort algorithm
         // http://www.chiark.greenend.org.uk/~sgtatham/algorithms/listsort.html
-        static Node SortLinked(Node list) {
+        private static Node SortLinked(Node list) {
             int i;
             Node p;
             Node q;
@@ -539,6 +519,7 @@ namespace Vertigo {
                     qSize = inSize;
 
                     while (pSize > 0 || (qSize > 0 && q != null)) {
+
                         if (pSize != 0 && (qSize == 0 || q == null || p.z <= q.z)) {
                             e = p;
                             p = p.nextZ;
@@ -566,6 +547,7 @@ namespace Vertigo {
 
                 tail.nextZ = null;
                 inSize *= 2;
+
             } while (numMerges > 1);
 
             return list;
@@ -591,7 +573,7 @@ namespace Vertigo {
         }
 
         // find the leftmost node of a polygon ring
-        static Node GetLeftmost(Node start) {
+        private static Node GetLeftmost(Node start) {
             Node p = start;
             Node leftmost = start;
             do {
@@ -606,14 +588,14 @@ namespace Vertigo {
         }
 
         // check if a point lies within a convex triangle
-        static bool PointInTriangle(float ax, float ay, float bx, float by, float cx, float cy, float px, float py) {
+        private static bool PointInTriangle(float ax, float ay, float bx, float by, float cx, float cy, float px, float py) {
             return (cx - px) * (ay - py) - (ax - px) * (cy - py) >= 0 &&
                    (ax - px) * (by - py) - (bx - px) * (ay - py) >= 0 &&
                    (bx - px) * (cy - py) - (cx - px) * (by - py) >= 0;
         }
 
         // check if a diagonal between two polygon nodes is valid (lies in polygon interior)
-        static bool IsValidDiagonal(Node a, Node b) {
+        private static bool IsValidDiagonal(Node a, Node b) {
             return a.next.i != b.i && a.prev.i != b.i && !IntersectsPolygon(a, b) &&
                    LocallyInside(a, b) && LocallyInside(b, a) && MiddleInside(a, b);
         }
@@ -624,12 +606,12 @@ namespace Vertigo {
         }
 
         // check if two points are equal
-        static bool Equals(Node p1, Node p2) {
+        private static bool Equals(Node p1, Node p2) {
             return p1.x == p2.x && p1.y == p2.y;
         }
 
         // check if two segments intersect
-        static bool Intersects(Node p1, Node q1, Node p2, Node q2) {
+        private static bool Intersects(Node p1, Node q1, Node p2, Node q2) {
             if ((Equals(p1, q1) && Equals(p2, q2)) ||
                 (Equals(p1, q2) && Equals(p2, q1))) {
                 return true;
@@ -640,7 +622,7 @@ namespace Vertigo {
         }
 
         // check if a polygon diagonal intersects any polygon segments
-        static bool IntersectsPolygon(Node a, Node b) {
+        private static bool IntersectsPolygon(Node a, Node b) {
             Node p = a;
             do {
                 if (p.i != a.i && p.next.i != a.i && p.i != b.i && p.next.i != b.i &&
@@ -655,12 +637,12 @@ namespace Vertigo {
         }
 
         // check if a polygon diagonal is locally inside the polygon
-        static bool LocallyInside(Node a, Node b) {
+        private static bool LocallyInside(Node a, Node b) {
             return Area(a.prev, a, a.next) < 0 ? Area(a, b, a.next) >= 0 && Area(a, a.prev, b) >= 0 : Area(a, b, a.prev) < 0 || Area(a, a.next, b) < 0;
         }
 
         // check if the middle point of a polygon diagonal is inside the polygon
-        static bool MiddleInside(Node a, Node b) {
+        private static bool MiddleInside(Node a, Node b) {
             var p = a;
             var inside = false;
             var px = (a.x + b.x) / 2;
@@ -680,17 +662,10 @@ namespace Vertigo {
         // link two polygon vertices with a bridge; if the vertices belong to the same ring, it splits polygon into two;
         // if one belongs to the outer ring and another to a hole, it merges it into a single ring
         private static Node SplitPolygon(Node a, Node b) {
-            Node a2 = s_NodePool.Get();
-            a2.i = a.i;
-            a2.x = a.x;
-            a2.y = a.y;
-            Node b2 = s_NodePool.Get();
-            b2.i = b.i;
-            b2.x = b.x;
-            b2.y = b.y;
-
-            Node an = a.next;
-            Node bp = b.prev;
+            var a2 = Get(a.i, a.x, a.y);
+            var b2 = Get(b.i, b.x, b.y);
+            var an = a.next;
+            var bp = b.prev;
 
             a.next = b;
             b.prev = a;
@@ -709,14 +684,12 @@ namespace Vertigo {
 
         // create a node and optionally link it with previous one (in a circular doubly linked list)
         private static Node InsertNode(int i, float x, float y, Node last) {
-            var p = s_NodePool.Get();
-            p.i = i;
-            p.x = x;
-            p.y = y;
+            var p = Get(i, x, y);
 
             if (last == null) {
                 p.prev = p;
                 p.next = p;
+
             }
             else {
                 p.next = last.next;
@@ -728,7 +701,7 @@ namespace Vertigo {
             return p;
         }
 
-        static void RemoveNode(Node p) {
+        private static void RemoveNode(Node p) {
             p.next.prev = p.prev;
             p.prev.next = p.next;
 
@@ -740,9 +713,7 @@ namespace Vertigo {
                 p.nextZ.prevZ = p.prevZ;
             }
 
-            s_NodePool.Release(p);
         }
-
 
         private class Node {
 
@@ -759,8 +730,6 @@ namespace Vertigo {
             public Node nextZ;
 
             public bool steiner;
-
-            public Node() { }
 
             public Node(int i, float x, float y) {
                 // vertex index in coordinates array
@@ -787,9 +756,8 @@ namespace Vertigo {
 
         }
 
-        private static float SignedArea(IList<float> data, int start, int end) {
+        public static float SignedArea(float[] data, int start, int end) {
             var sum = default(float);
-
             for (int i = start, j = end - 2; i < end; i += 2) {
                 sum += (data[j] - data[i]) * (data[i + 1] + data[j + 1]);
                 j = i;
@@ -800,17 +768,18 @@ namespace Vertigo {
 
         // return a percentage difference between the polygon area and its triangulation area;
         // used to verify correctness of triangulation
-        public static float Deviation(IList<float> data, IList<int> holeIndices, IList<int> triangles) {
+        public static float Deviation(LightList<float> input, LightList<int> holeIndices, LightList<int> triangles) {
             var hasHoles = holeIndices.Count > 0;
-            var outerLen = hasHoles ? holeIndices[0] * 2 : data.Count;
+            var outerLen = hasHoles ? holeIndices[0] * 2 : input.Count;
 
+            float[] data = input.Array;
             var polygonArea = Math.Abs(SignedArea(data, 0, outerLen));
             if (hasHoles) {
                 var len = holeIndices.Count;
 
                 for (var i = 0; i < len; i++) {
                     var start = holeIndices[i] * 2;
-                    var end = i < len - 1 ? holeIndices[i + 1] * 2 : data.Count;
+                    var end = i < len - 1 ? holeIndices[i + 1] * 2 : input.Count;
                     polygonArea -= Math.Abs(SignedArea(data, start, end));
                 }
             }
@@ -826,15 +795,6 @@ namespace Vertigo {
             }
 
             return polygonArea == 0 && trianglesArea == 0 ? 0 : Math.Abs((trianglesArea - polygonArea) / polygonArea);
-        }
-
-
-        private class NodeComparer : IComparer<Node> {
-
-            public int Compare(Node a, Node b) {
-                return Math.Sign(a.x - b.x);
-            }
-
         }
 
     }
