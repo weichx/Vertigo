@@ -1,71 +1,74 @@
-﻿using Effect;
+﻿using System;
 using UnityEngine;
-using UnityEngine.Rendering;
 using Vertigo;
 
 public class VertigoBehaviorRoot : MonoBehaviour {
 
-    private VertigoContext ctx;
+    private VertigoContextOld ctx;
     public new Camera camera;
 
-    public Texture2D texture;
-
-    public ShadowOutline shadowOutline;
-
-    public ShadowData shadowData;
-
-    private bool didStart = false;
-
-    public Vector2 shadowOffset = new Vector2(20, 20);
-
-    public VertigoCtx ctx2;
-
+    public float radius = 50f;
+    public float width = 50f;
+    public float height = 100f;
+    public VertigoContext ctx2;
+    ShapeGenerator shapeGen = new ShapeGenerator();
+    GeometryGenerator geo = new GeometryGenerator();
+    private GeometryCache cache;
+    public int segmentCount = 60;
+    
     public void Start() {
-        didStart = true;
-        ctx = new VertigoContext();
-        ctx2 = new VertigoCtx();
-        //  Camera.onPostRender += Render;
-        //camera.AddCommandBuffer(CameraEvent.AfterEverything, ctx.commandBuffer);
-        shadowOutline = new ShadowOutline(new Material(Shader.Find("Vertigo/Default")));
-    }
-
-    private void OnDestroy() {
-        Camera.onPostRender = null;
+        ctx = new VertigoContextOld();
+        ctx2 = new VertigoContext();
+        
+        shapeGen.Rect(100, 100, 200, 100);
+        shapeGen.Circle(0, 300, 50);
+        
+        geo.SetLineCap(LineCap.Round);
+        geo.SetLineJoin(LineJoin.Bevel);
+        geo.SetStrokeColor(Color.yellow);
+        geo.SetStrokeWidth(4f);
+        cache = geo.Fill(shapeGen);
     }
 
     public void Update() {
-//    public void Render(Camera camera) {
-        if (!didStart) return;
-
         camera.orthographicSize = Screen.height * 0.5f;
 
-        PathGenerator path = new PathGenerator();
-        path.MoveTo(100, 100);
-        path.LineTo(200, 200);
+        ctx2.Clear();
+        shapeGen = new ShapeGenerator();
         
-        GeometryGenerator geo = new GeometryGenerator();
+        shapeGen.BeginPath();
+        shapeGen.MoveTo(300, 300);
+        shapeGen.LineTo(300, 400);
+        shapeGen.LineTo(300, 500);
+        shapeGen.LineTo(200, 200);
+        shapeGen.ClosePath();
+        
+//        shapeGen.Ellipse(0, 0, width, height, segmentCount);
+//        shapeGen.Circle(300, 0, width, segmentCount);
+//        shapeGen.RegularPolygon(-0, 0, width, height, segmentCount);
 
-        geo.SetLineCap(LineCap.Round);
-        geo.SetLineJoin(LineJoin.Bevel);
+//        shapeGen.Rhombus(-300, 0, width, height);
+//        shapeGen.Triangle(0, -50, 100, 100, -100, 100);
+        cache = geo.Fill(shapeGen);
         
-        geo.StrokeSDF(path);
         
-        ctx2.SetStrokeWidth(4);
-        ctx2.SetStrokeColor(Color.yellow);
-        
-        VertigoMaterial material = ctx2.MaterialPool.GetShared("VertigoSDF");
-        
-        ctx2.Draw(geo, material);
-        
-//        ctx.BeginPath();
-//        ctx.Rect(0, 0, 112, 188);
-//        ctx.ClosePath();
-//        ctx.SetFill(Color.red);
-//        ctx.SetTexture(texture, 0);
-//        shadowOutline.data = shadowData;
-//        ctx.Fill(shadowOutline);
-//        ctx.Render(camera);
-//        ctx.Clear();
+        VertigoMaterial sharedMat = ctx2.materialPool.GetShared("VertigoSDF");
+
+        long start = GC.GetTotalMemory(false);
+        cache.SetVertexColors(0, Color.red);
+        ctx2.Draw(cache, sharedMat);
+
+        ctx2.SetPosition(new Vector3(200, 200));
+
+//        cache.SetVertexColors(0, Color.green);
+//        ctx2.Draw(cache, sharedMat);
+
+        ctx2.Flush(camera);
+        long end = GC.GetTotalMemory(false);
+        if (end - start > 0) {
+            Debug.Log((end - start) + " allocated bytes");
+        }
+
     }
 
 }

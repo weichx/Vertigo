@@ -14,9 +14,17 @@ namespace Vertigo {
 
         internal VertigoMaterial(Material material, IList<string> keywords) {
             this.material = material;
-            this.keywords = new string[keywords.Count];
             this.instances = new LightList<VertigoMaterial>(4);
             this.isActive = true;
+            if (keywords == null) {
+                this.keywords = null;
+            }
+            else {
+                this.keywords = new string[keywords.Count];
+                for (int i = 0; i < keywords.Count; i++) {
+                    this.keywords[i] = keywords[i];
+                }
+            }
         }
 
         internal VertigoMaterial(VertigoMaterial parent) {
@@ -53,6 +61,10 @@ namespace Vertigo {
 
         public void SetFloat(int key, float value) {
             material.SetFloat(key, value);
+        }
+
+        public void SetColor(string key, Color color) {
+            material.SetColor(key, color);
         }
 
     }

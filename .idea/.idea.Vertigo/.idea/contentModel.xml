@@ -8,13 +8,21 @@
           <e p="TextureAtlasEditor.cs" t="Include" />
         </e>
         <e p="Vertigo" t="Include">
+          <e p="Bezier.cs" t="Include" />
           <e p="BlendMode.cs" t="Include" />
           <e p="BlendOp.cs" t="Include" />
           <e p="ColorMode.cs" t="Include" />
           <e p="CompareFunction.cs" t="Include" />
+          <e p="DefaultDrawCallBatcher.cs" t="Include" />
+          <e p="Earcut.cs" t="Include" />
           <e p="Geometry.cs" t="Include" />
+          <e p="GeometryCache.cs" t="Include" />
+          <e p="GeometryGenerator.cs" t="Include" />
           <e p="LightList.cs" t="Include" />
+          <e p="LineCap.cs" t="Include" />
+          <e p="LineJoin.cs" t="Include" />
           <e p="ListAccessor.cs" t="Include" />
+          <e p="MaterialPool.cs" t="Include" />
           <e p="MeshRange.cs" t="Include" />
           <e p="MeshSlice.cs" t="Include" />
           <e p="ParameterTexture.cs" t="Include" />
@@ -37,6 +45,7 @@
           <e p="ShadowOutline.cs" t="Include" />
           <e p="Shape.cs" t="Include" />
           <e p="ShapeBatch.cs" t="Include" />
+          <e p="ShapeGenerator.cs" t="Include" />
           <e p="ShapeMeshBuffer.cs" t="Include" />
           <e p="ShapeMeshData.cs" t="Include" />
           <e p="ShapeType.cs" t="Include" />
@@ -52,7 +61,10 @@
           <e p="Vertigo.cs" t="Include" />
           <e p="Vertigo.Src.asmdef" t="Include" />
           <e p="VertigoBehaviorRoot.cs" t="Include" />
+          <e p="VertigoContext.cs" t="Include" />
           <e p="VertigoEffect.cs" t="Include" />
+          <e p="VertigoMaterial.cs" t="Include" />
+          <e p="VertigoMesh.cs" t="Include" />
           <e p="VertigoState.cs" t="Include" />
         </e>
       </e>

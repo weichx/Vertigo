@@ -12,7 +12,11 @@ namespace Vertigo {
 
         Unset,
 
-        ClosedPath
+        ClosedPath,
+
+        Polygon,
+
+        Rhombus
 
     }
 

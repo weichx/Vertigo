@@ -33,6 +33,14 @@ namespace Vertigo {
                    && zWriteColorMaskCullMode == other.zWriteColorMaskCullMode;
         }
 
+        public static bool operator ==(RenderSettings a, RenderSettings b) {
+            return a.IsEqualTo(b);
+        }
+
+        public static bool operator !=(RenderSettings a, RenderSettings b) {
+            return !a.IsEqualTo(b);
+        }
+
     }
 
 }

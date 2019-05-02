@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using UnityEngine;
 
 namespace Vertigo {
 
@@ -91,6 +92,14 @@ namespace Vertigo {
         public T this[int idx] {
             get => array[idx];
             set => array[idx] = value;
+        }
+
+        public void SetFromRange(T[] source, int start, int count) {
+            if (array.Length <= count) {
+                System.Array.Resize(ref array, count * 2);
+            }
+            System.Array.Copy(source, start, array, 0, count);
+            size = count;
         }
 
     }

@@ -3,7 +3,7 @@ using UnityEngine.Rendering;
 
 namespace Vertigo {
 
-    public class VertigoContext {
+    public class VertigoContextOld {
 
         public readonly int instanceId;
         
@@ -27,7 +27,7 @@ namespace Vertigo {
         private static readonly int s_VertigoParameterTex = Shader.PropertyToID("_VertigoParameterTex");
         private static readonly int SVertigoParameterTexWidth = Shader.PropertyToID("s_VertigoParameterTexWidth");
 
-        public VertigoContext() {
+        public VertigoContextOld() {
 
             instanceId = s_InstanceIdGenerator;
             s_InstanceIdGenerator += 100000;
@@ -318,7 +318,7 @@ namespace Vertigo {
         }
 
         public void SetTexture(Texture2D texture, int i) {
-            state.renderState.texture0 = texture;
+           // state.renderState.texture0 = texture;
         }
 
     }

@@ -5,9 +5,7 @@ namespace Vertigo {
 
     public struct VertigoState {
 
-        public float3x2 transform;
-        public Rect scissorRect;
-        public RenderState renderState;
+        public Matrix4x4 transform;
         public RenderSettings renderSettings;
 
     }

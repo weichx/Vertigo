@@ -17,7 +17,7 @@ namespace Effect {
         }
 
         public override Material GetMaterialToDraw(int drawCallId, in VertigoState state, ShapeBatch shapeBatch, MaterialPropertyBlock block) {
-            block.SetTexture(_MainTex, state.renderState.texture0);
+           // block.SetTexture(_MainTex, state.renderState.texture0);
             
             material.EnableKeyword("TONE_SEPIA");
             material.EnableKeyword("BLUR_7x7");
