@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Unity.Mathematics;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace Vertigo {
 
@@ -144,11 +146,14 @@ namespace Vertigo {
                         Vector4 uv2 = new Vector4(1, 0);
                         Vector4 uv3 = new Vector4(0, 0);
 
-                        int startVert = retn.positions.size;
+                        int startVert = retn.vertexCount;
+                        int startTriangle = retn.triangleCount;
+                        
                         Vector3[] positions = retn.positions.array;
                         Vector3[] normals = retn.normals.array;
                         Color[] colors = retn.colors.array;
                         Vector4[] texCoord0 = retn.texCoord0.array;
+                        int[] triangles = retn.triangles.array;
 
                         positions[startVert + 0] = p0;
                         positions[startVert + 1] = p1;
@@ -170,7 +175,28 @@ namespace Vertigo {
                         texCoord0[startVert + 2] = uv2;
                         texCoord0[startVert + 3] = uv3;
 
-                        retn.AddQuad();
+                        retn.shapes.Add(new GeometryShape() {
+                            vertexStart = startVert,
+                            vertexCount = 4,
+                            triangleStart = startTriangle,
+                            triangleCount = 6
+                        });
+                        
+                        int vertexCount = startVert + 4;
+                        
+                        triangles[startTriangle + 0] = vertexCount + 0;
+                        triangles[startTriangle + 1] = vertexCount + 1;
+                        triangles[startTriangle + 2] = vertexCount + 2;
+                        triangles[startTriangle + 3] = vertexCount + 2;
+                        triangles[startTriangle + 4] = vertexCount + 3;
+                        triangles[startTriangle + 5] = vertexCount + 0;
+                      
+                        retn.positions.size += 4;
+                        retn.normals.size += 4;
+                        retn.colors.size += 4;
+                        retn.texCoord0.size += 4;
+                        retn.texCoord1.size += 4;
+                        retn.triangles.size += 6;
 
                         break;
                     }
@@ -212,11 +238,13 @@ namespace Vertigo {
                         Vector4 uv2 = new Vector4(0.5f, 0f);
                         Vector4 uv3 = new Vector4(0f, 0.5f);
 
-                        int startVert = retn.positions.size;
+                        int startVert = retn.vertexCount;
+                        int startTriangle = retn.triangleCount;
                         Vector3[] positions = retn.positions.array;
                         Vector3[] normals = retn.normals.array;
                         Color[] colors = retn.colors.array;
                         Vector4[] texCoord0 = retn.texCoord0.array;
+                        int[] triangles = retn.triangles.array;
 
                         positions[startVert + 0] = new Vector3(x + halfWidth, -y);
                         positions[startVert + 1] = new Vector3(x + width, -(y + halfHeight));
@@ -238,7 +266,28 @@ namespace Vertigo {
                         texCoord0[startVert + 2] = uv2;
                         texCoord0[startVert + 3] = uv3;
 
-                        retn.AddQuad();
+                        retn.shapes.Add(new GeometryShape() {
+                            vertexStart = startVert,
+                            vertexCount = 4,
+                            triangleStart = startTriangle,
+                            triangleCount = 6
+                        });
+                        
+                        int vertexCount = startVert + 4;
+                        triangles[startTriangle + 0] = vertexCount + 0;
+                        triangles[startTriangle + 1] = vertexCount + 1;
+                        triangles[startTriangle + 2] = vertexCount + 2;
+                        triangles[startTriangle + 3] = vertexCount + 2;
+                        triangles[startTriangle + 4] = vertexCount + 3;
+                        triangles[startTriangle + 5] = vertexCount + 0;
+                      
+                        retn.positions.size += 4;
+                        retn.normals.size += 4;
+                        retn.colors.size += 4;
+                        retn.texCoord0.size += 4;
+                        retn.texCoord1.size += 4;
+                        retn.triangles.size += 6;
+                        
                         break;
                     }
 
@@ -247,42 +296,97 @@ namespace Vertigo {
                     }
 
                     case ShapeType.ClosedPath: {
+                        Color color = renderState.fillColor;
                         ShapeGenerator.PathDef pathDef = shape.pathDef;
-                        if (pathDef.hasHoles) { }
 
-                        int start = pathDef.pointRange.start;
-                        int end = pathDef.pointRange.end;
+                        int pointRangeStart = pathDef.pointRange.start;
+                        int pointRangeEnd = pathDef.pointRange.end;
+
+                        int holeRangeStart = pathDef.holeRange.start;
+                        int holeRangeEnd = pathDef.holeRange.end;
 
                         int vertexStart = retn.vertexCount;
                         int triangleStart = retn.triangleCount;
 
                         ShapeGenerator.PathPoint[] points = shapeGenerator.points.array;
+                        ShapeGenerator.PathPoint[] holes = shapeGenerator.holes.array;
 
-                        s_FloatScratch.EnsureCapacity(end - start);
+                        s_FloatScratch.EnsureCapacity(2 * (pointRangeEnd - pointRangeStart));
+                        retn.EnsureAdditionalCapacity(pathDef.TotalVertices, 0);
+
+                        int floatIdx = 0;
+                        float[] floats = s_FloatScratch.Array;
+                        Vector3[] positions = retn.positions.array;
+                        Vector3[] normals = retn.normals.array;
+                        Vector4[] texCoord0 = retn.texCoord0.array;
+                        Color[] colors = retn.colors.array;
+                        int vertexIdx = retn.positions.size;
+
+                        float minX = shape.bounds.xMin;
+                        float maxX = shape.bounds.xMax;
+                        float minY = shape.bounds.yMin;
+                        float maxY = shape.bounds.yMax;
                         
-                        for (int j = start; j < end; j++) {
+                        Vector3 normal = new Vector3(0, 0, -1);
+
+                        for (int j = pointRangeStart; j < pointRangeEnd; j++) {
                             Vector2 position = points[j].position;
-                            s_FloatScratch.AddUnchecked(position.x);
-                            s_FloatScratch.AddUnchecked(-position.y);
-                            retn.positions.Add(new Vector3(position.x, -position.y));
+                            floats[floatIdx++] = position.x;
+                            floats[floatIdx++] = -position.y;
+                            colors[vertexIdx] = color;
+                            normals[vertexIdx] = normal;
+                            positions[vertexIdx] = new Vector3(position.x, -position.y);
+                            texCoord0[vertexIdx] = new Vector4(
+                                PercentOfRange(position.x, minX, maxX),
+                                1 - PercentOfRange(position.y, minY, maxY)
+                            );
+                            vertexIdx++;
                         }
 
-                        long before = GC.GetTotalMemory(false);
-                        Earcut.Tessellate(s_FloatScratch, s_IntScratch0, s_IntScratch1);
-                        long after = GC.GetTotalMemory(false);
+                        for (int j = holeRangeStart; j < holeRangeEnd; j++) {
 
-                        Debug.Log(after - before);
-                        
+                            if ((holes[j].flags & ShapeGenerator.PointFlag.HoleStart) != 0) {
+                                s_IntScratch0.Add(vertexIdx);
+                            }
+
+                            Vector2 position = holes[j].position;
+                            floats[floatIdx++] = position.x;
+                            floats[floatIdx++] = -position.y;
+                            colors[vertexIdx] = color;
+                            normals[vertexIdx] = normal;
+                            positions[vertexIdx] = new Vector3(position.x, -position.y);
+                            texCoord0[vertexIdx] = new Vector4(
+                                PercentOfRange(position.x, minX, maxX),
+                                1 - PercentOfRange(position.y, minY, maxY)
+                            );
+                            vertexIdx++;
+                        }
+
+                        s_FloatScratch.Count = floatIdx;
+
+                        Earcut.Tessellate(s_FloatScratch, s_IntScratch0, s_IntScratch1);
+
                         int count = s_IntScratch1.Count;
                         int[] tessellatedIndices = s_IntScratch1.Array;
 
+                        retn.EnsureAdditionalCapacity(0, count);
+                        int triangleIdx = retn.triangles.size;
+                        int[] triangles = retn.triangles.array;
+
                         for (int j = 0; j < count; j++) {
-                            retn.triangles.Add(tessellatedIndices[j]);
+                            triangles[triangleIdx++] = tessellatedIndices[j];
                         }
 
                         s_IntScratch0.Count = 0;
                         s_IntScratch1.Count = 0;
                         s_FloatScratch.Count = 0;
+
+                        retn.colors.size = vertexIdx;
+                        retn.normals.size = vertexIdx;
+                        retn.positions.size = vertexIdx;
+                        retn.texCoord0.size = vertexIdx;
+                        retn.texCoord1.size = vertexIdx;
+                        retn.triangles.size = triangleIdx;
                         
                         retn.shapes.Add(new GeometryShape() {
                             vertexStart = vertexStart,
@@ -290,6 +394,7 @@ namespace Vertigo {
                             triangleStart = triangleStart,
                             triangleCount = retn.triangleCount - triangleStart
                         });
+
                         break;
                     }
 

@@ -43,28 +43,7 @@ namespace Vertigo {
             texCoord1.EnsureAdditionalCapacity(vertCount);
             triangles.EnsureAdditionalCapacity(triCount);
         }
-
-        public void AddQuad() {
-            shapes.Add(new GeometryShape() {
-                vertexStart = vertexCount,
-                vertexCount = 4,
-                triangleStart = triangleCount,
-                triangleCount = 6
-            });
-            triangles[triangleCount + 0] = vertexCount + 0;
-            triangles[triangleCount + 1] = vertexCount + 1;
-            triangles[triangleCount + 2] = vertexCount + 2;
-            triangles[triangleCount + 3] = vertexCount + 2;
-            triangles[triangleCount + 4] = vertexCount + 3;
-            triangles[triangleCount + 5] = vertexCount + 0;
-            positions.size += 4;
-            normals.size += 4;
-            colors.size += 4;
-            texCoord0.size += 4;
-            texCoord1.size += 4;
-            triangles.size += 6;
-        }
-
+       
         public bool SetVertexColors(int shapeIdx, Color color) {
             if (shapeIdx < 0 || shapeIdx > shapes.size) {
                 return false;

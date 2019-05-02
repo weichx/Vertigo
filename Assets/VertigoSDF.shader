@@ -47,9 +47,9 @@
 
             fixed4 frag (v2f i) : SV_Target {
                 fixed4 col = tex2D(_MainTex, i.texCoord0.xy);
+                return lerp(fixed4(1, 0, 0, 1), col, col.a);
 //                return col;
-//                return col;
-                return fixed4(1, 0, 0, 1);
+                return fixed4(i.texCoord0.y, i.texCoord0.y, i.texCoord0.y, 1); //1, 0, 0, 1);
             }
             ENDCG
         }

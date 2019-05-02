@@ -9,66 +9,123 @@ namespace Vertigo {
         private PathDef currentPath;
 
         internal StructList<PathPoint> points;
+        internal StructList<PathPoint> holes;
         internal StructList<ShapeDef> shapes;
+
         private bool buildingPath;
-        
+        private bool inHole;
+
         public ShapeGenerator(int capacity = 8) {
             this.shapes = new StructList<ShapeDef>(capacity);
             this.points = new StructList<PathPoint>(capacity * 8);
+            this.holes = new StructList<PathPoint>(capacity * 2);
         }
 
-//        public void MoveTo(float x, float y) {
-//            if (!buildingPath) {
-//                return;
-//            }
-//            lastPoint.x = x;
-//            lastPoint.y = y;
-//            points.Add(new PathPoint(x, y, PointFlag.Corner));
-//            // todo - check this isn't duplicated
-//            currentPath.pointRange.length++;
-//
-//        }
-
         public void LineTo(float x, float y) {
-            points.Add(new PathPoint(x, y, PointFlag.Corner));
-            currentPath.pointRange.length++;
+            if (!buildingPath) return;
+
+            if (inHole) {
+                holes.Add(new PathPoint(x, y, PointFlag.Corner | PointFlag.Hole));
+                currentPath.holeRange.length++;
+            }
+            else {
+                points.Add(new PathPoint(x, y, PointFlag.Corner));
+                currentPath.pointRange.length++;
+            }
+
+            lastPoint = new Vector2(x, y);
+        }
+
+        public void HorizontalLineTo(float x) {
+            LineTo(x, lastPoint.y);
+        }
+
+        public void VerticalLineTo(float y) {
+            LineTo(lastPoint.x, y);
+        }
+        
+        public void CubicBezierTo(float c0x, float c0y, float c1x, float c1y, float x, float y) {
+            int pointCount = 0;
+            Vector2 end = new Vector2(x, y);
+            // todo flags
+            if (inHole) {
+                pointCount = Bezier.CubicCurve(holes, lastPoint, new Vector2(c0x, c0y), new Vector2(c1x, c1y), end);
+                currentPath.holeRange.length += pointCount;
+            }
+            else {
+                pointCount = Bezier.CubicCurve(points, lastPoint, new Vector2(c0x, c0y), new Vector2(c1x, c1y), end);
+                currentPath.pointRange.length += pointCount;
+            }
+
+            lastPoint.x = end.x;
+            lastPoint.y = end.y;
+        }
+
+        public void RectTo(float x, float y) {
+            Vector2 start = lastPoint;
+            HorizontalLineTo(x);
+            VerticalLineTo(y);
+            HorizontalLineTo(start.x);
+            VerticalLineTo(start.y);
         }
 
         public void BeginPath(float x, float y) {
             if (buildingPath) {
                 // delete old path if it hasn't ended
+                points.Count = currentPath.pointRange.start;
+                holes.Count = currentPath.holeRange.start;
             }
+
             currentPath = new PathDef();
             currentPath.pointRange.start = points.Count;
+            currentPath.holeRange.start = holes.Count;
             currentPath.pointRange.length++;
             points.Add(new PathPoint(x, y, PointFlag.Corner));
             buildingPath = true;
+            inHole = false; // just in case
+            lastPoint = new Vector2(x, y);
         }
 
         public void ClosePath() {
+            if (!buildingPath) return;
             buildingPath = false;
-            currentPath.isClosed = true;
-            currentPath.pointRange.length++;
-            points.Add(points[currentPath.pointRange.start]);
+            inHole = false;
             ShapeDef shapeDef = new ShapeDef(ShapeType.ClosedPath);
             shapeDef.pathDef = currentPath;
-            
+            shapeDef.bounds = ComputePathBounds();
+            ClampHoles(shapeDef.pathDef.holeRange, shapeDef.bounds);
             shapes.Add(shapeDef);
             currentPath = default;
+            lastPoint.x = 0;
+            lastPoint.y = 0;
         }
 
         public void EndPath() {
+            if (!buildingPath) return;
             buildingPath = false;
+            inHole = false;
             ShapeDef shapeDef = new ShapeDef(ShapeType.Path);
             shapeDef.pathDef = currentPath;
+            shapeDef.bounds = ComputePathBounds();
+            ClampHoles(shapeDef.pathDef.holeRange, shapeDef.bounds);
             shapes.Add(shapeDef);
             currentPath = default;
+            lastPoint.x = 0;
+            lastPoint.y = 0;
         }
 
-        public void BeginHole() { }
+        public void BeginHole(float x, float y) {
+            inHole = true;
+            holes.Add(new PathPoint(x, y, PointFlag.Corner | PointFlag.Hole | PointFlag.HoleStart));
+            currentPath.holeRange.length++;
+            lastPoint.x = x;
+            lastPoint.y = y;
+        }
 
-        public void CloseHole() { }
-        
+        public void CloseHole() {
+            inHole = false;
+        }
+
         public void Rect(float x, float y, float width, float height) {
             ShapeDef shapeDef = new ShapeDef(ShapeType.Rect);
             shapeDef.p0 = new Vector2(x, y);
@@ -77,6 +134,7 @@ namespace Vertigo {
             shapes.Add(shapeDef);
         }
 
+        // todo -- not working yet
         public void RoundedRect(float x, float y, float width, float height, float r0, float r1, float r2, float r3) {
             ShapeDef shapeDef = new ShapeDef(ShapeType.RoundedRect);
             shapeDef.p0 = new Vector2(x, y);
@@ -133,7 +191,7 @@ namespace Vertigo {
             maxX = x2 > maxX ? x2 : maxX;
             maxY = y1 > maxY ? y1 : maxY;
             maxY = y2 > maxY ? y2 : maxY;
-            shapeDef.bounds = new Rect(minX, minY, maxX - minX, maxY - minY); 
+            shapeDef.bounds = new Rect(minX, minY, maxX - minX, maxY - minY);
             shapes.Add(shapeDef);
         }
 
@@ -144,15 +202,83 @@ namespace Vertigo {
             shapeDef.bounds = new Rect(x, y, width, height);
             shapes.Add(shapeDef);
         }
-        
+
         // equallateral triangle & iso triangle should be simple once triangle is done
         // could also add trapezoid, vesica , & cross
+
+        private Rect ComputePathBounds() {
+            int start = currentPath.pointRange.start;
+            int end = currentPath.pointRange.end;
+            float minX = float.MaxValue;
+            float minY = float.MaxValue;
+            float maxX = float.MinValue;
+            float maxY = float.MinValue;
+            PathPoint[] array = points.array;
+            for (int i = start; i < end; i++) {
+                float x = array[i].position.x;
+                float y = array[i].position.y;
+
+                if (x < minX) {
+                    minX = x;
+                }
+
+                if (x > maxX) {
+                    maxX = x;
+                }
+
+                if (y < minY) {
+                    minY = y;
+                }
+
+                if (y > maxY) {
+                    maxY = y;
+                }
+            }
+
+            return new Rect(minX, minY, maxX - minX, maxY - minY);
+        }
+
+        private void ClampHoles(in RangeInt holeRange, in Rect rect) {
+            int start = holeRange.start;
+            int end = holeRange.end;
+
+            if (end - start == 0) {
+                return;
+            }
+            
+            PathPoint[] array = holes.array;
+            
+            float minX = rect.xMin;
+            float minY = rect.yMin;
+            float maxX = rect.xMax;
+            float maxY = rect.yMax;
+            for (int i = start; i < end; i++) {
+                float x = array[i].position.x;
+                float y = array[i].position.y;
+                if (x < minX) x = minX;
+                if (x > maxX) x = maxX;
+                if (y < minY) y = minY;
+                if (y > maxY) y = maxY;
+                array[i].position.x = x;
+                array[i].position.y = y;
+            }
+        }
         
+        public void Clear() {
+            shapes.QuickClear();
+            points.QuickClear();
+            holes.QuickClear();
+            inHole = false;
+            buildingPath = false;
+            lastPoint = Vector2.zero;
+        }
+
         [Flags]
         internal enum PointFlag {
 
             Hole = 1 << 1,
-            Corner = 1 << 2
+            Corner = 1 << 2,
+            HoleStart = 1 << 3
 
         }
 
@@ -171,9 +297,10 @@ namespace Vertigo {
 
         internal struct PathDef {
 
-            public bool isClosed;
-            public bool hasHoles;
             public RangeInt pointRange;
+            public RangeInt holeRange;
+
+            public int TotalVertices => pointRange.length + holeRange.length;
 
         }
 
@@ -200,17 +327,6 @@ namespace Vertigo {
 
         }
 
-        public void Clear() {
-            throw new NotImplementedException();
-        }
-
     }
 
 }
-
-//public void CubicCurveTo(Vector2 ctrl0, Vector2 ctrl1, Vector2 end) {
-//int pointStart = points.Count;
-//int pointCount = Bezier.CubicCurve(points, lastPoint, ctrl0, ctrl1, end);
-//UpdateShape(pointStart, pointCount);
-//lastPoint = end;
-//}

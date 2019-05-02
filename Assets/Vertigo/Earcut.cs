@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace Vertigo {
 
@@ -74,6 +73,7 @@ namespace Vertigo {
 
             EarcutLinked(outerNode, triangles, minX, minY, invSize);
 
+            // pooling clears on Get, not release so we don't need to re-iterate the list
             inactive.AddRange(active);
             active.QuickClear();
         }
@@ -123,7 +123,7 @@ namespace Vertigo {
             return last;
         }
 
-        // eliminate colinear or duplicate points
+        // eliminate co-linear or duplicate points
         private static Node FilterPoints(Node start, Node end = null) {
             if (start == null) {
                 return null;
@@ -249,13 +249,13 @@ namespace Vertigo {
                 return false; // reflex, can't be an ear
             }
 
-            // triangle bbox; min & max are calculated like this for speed
+            // triangle bounding box; min & max are calculated like this for speed
             var minTX = a.x < b.x ? (a.x < c.x ? a.x : c.x) : (b.x < c.x ? b.x : c.x);
             var minTY = a.y < b.y ? (a.y < c.y ? a.y : c.y) : (b.y < c.y ? b.y : c.y);
             var maxTX = a.x > b.x ? (a.x > c.x ? a.x : c.x) : (b.x > c.x ? b.x : c.x);
             var maxTY = a.y > b.y ? (a.y > c.y ? a.y : c.y) : (b.y > c.y ? b.y : c.y);
 
-            // z-order range for the current triangle bbox;
+            // z-order range for the current triangle bounding box;
             var minZ = ZOrder(minTX, minTY, minX, minY, invSize);
             var maxZ = ZOrder(maxTX, maxTY, minX, minY, invSize);
 
@@ -343,7 +343,7 @@ namespace Vertigo {
                         // split the polygon in two by the diagonal
                         var c = SplitPolygon(a, b);
 
-                        // filter colinear points around the cuts
+                        // filter co-linear points around the cuts
                         a = FilterPoints(a, a.next);
                         c = FilterPoints(c, c.next);
 
@@ -445,14 +445,13 @@ namespace Vertigo {
             var mx = m.x;
             var my = m.y;
             var tanMin = float.PositiveInfinity;
-            float tan;
 
             p = m.next;
 
             while (p != stop) {
                 if (hx >= p.x && p.x >= mx && hx != p.x && PointInTriangle(hy < my ? hx : qx, hy, mx, my, hy < my ? qx : hx, hy, p.x, p.y)) {
 
-                    tan = Math.Abs(hy - p.y) / (hx - p.x); // tangential
+                    var tan = Math.Abs(hy - p.y) / (hx - p.x);
 
                     if ((tan < tanMin || (tan == tanMin && p.x > m.x)) && LocallyInside(p, hole)) {
                         m = p;
@@ -488,26 +487,20 @@ namespace Vertigo {
         // Simon Tatham's linked list merge sort algorithm
         // http://www.chiark.greenend.org.uk/~sgtatham/algorithms/listsort.html
         private static Node SortLinked(Node list) {
-            int i;
-            Node p;
-            Node q;
-            Node e;
-            Node tail;
             int numMerges;
-            int pSize;
-            int qSize;
             int inSize = 1;
 
             do {
-                p = list;
+                var p = list;
                 list = null;
-                tail = null;
+                Node tail = null;
                 numMerges = 0;
 
                 while (p != null) {
                     numMerges++;
-                    q = p;
-                    pSize = 0;
+                    var q = p;
+                    var pSize = 0;
+                    int i;
                     for (i = 0; i < inSize; i++) {
                         pSize++;
                         q = q.nextZ;
@@ -516,10 +509,11 @@ namespace Vertigo {
                         }
                     }
 
-                    qSize = inSize;
+                    var qSize = inSize;
 
                     while (pSize > 0 || (qSize > 0 && q != null)) {
 
+                        Node e;
                         if (pSize != 0 && (qSize == 0 || q == null || p.z <= q.z)) {
                             e = p;
                             p = p.nextZ;
@@ -553,8 +547,8 @@ namespace Vertigo {
             return list;
         }
 
-        // z-order of a point given coords and inverse of the longer side of data bbox
-        static int ZOrder(float x, float y, float minX, float minY, float invSize) {
+        // z-order of a point given coords and inverse of the longer side of data bounding box
+        private static int ZOrder(float x, float y, float minX, float minY, float invSize) {
             // coords are transformed into non-negative 15-bit integer range
             int intX = (int) (32767 * (x - minX) * invSize);
             int intY = (int) (32767 * (y - minY) * invSize);
@@ -756,7 +750,7 @@ namespace Vertigo {
 
         }
 
-        public static float SignedArea(float[] data, int start, int end) {
+        private static float SignedArea(float[] data, int start, int end) {
             var sum = default(float);
             for (int i = start, j = end - 2; i < end; i += 2) {
                 sum += (data[j] - data[i]) * (data[i + 1] + data[j + 1]);
