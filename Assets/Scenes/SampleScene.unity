@@ -328,6 +328,17 @@ MonoBehaviour:
   width: 50
   height: 100
   segmentCount: 60
+  miterLimit: 10
+  strokeWidth: 60
+  lineCap: 4
+  lineJoin: 3
+  strokeColor: {r: 1, g: 1, b: 1, a: 1}
+  vector2s:
+  - {x: 0, y: 0}
+  - {x: 300, y: 0}
+  - {x: 300, y: 300}
+  - {x: 0, y: 300}
+  closed: 0
 --- !u!4 &1664507544
 Transform:
   m_ObjectHideFlags: 0

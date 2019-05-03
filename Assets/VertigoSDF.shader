@@ -10,6 +10,16 @@
         LOD 100
         Cull Off
         Blend SrcAlpha OneMinusSrcAlpha
+        
+        // this stencil setting solves self-blending
+        // does mean we have to issue the draw call twice probably
+        // if we want to reset the stencil
+        Stencil {
+            Ref 0
+            Comp Equal
+            Pass IncrSat 
+            Fail IncrSat
+        }
         Pass
         {
             CGPROGRAM
@@ -47,9 +57,9 @@
 
             fixed4 frag (v2f i) : SV_Target {
                 fixed4 col = tex2D(_MainTex, i.texCoord0.xy);
-                return lerp(fixed4(1, 0, 0, 1), col, col.a);
+                return i.color; //lerp(fixed4(1, 0, 0, 1), col, col.a);
 //                return col;
-                return fixed4(i.texCoord0.y, i.texCoord0.y, i.texCoord0.y, 1); //1, 0, 0, 1);
+                return fixed4(1, 1, 1, 1);//fixed4(i.texCoord0.y, i.texCoord0.y, i.texCoord0.y, 1); //1, 0, 0, 1);
             }
             ENDCG
         }

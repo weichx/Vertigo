@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Vertigo {
 
@@ -26,7 +27,9 @@ namespace Vertigo {
             float[] data = input.Array;
             bool hasHoles = holeIndices.Count > 0;
             int outerLen = hasHoles ? holeIndices[0] * 2 : input.Count;
+
             Node outerNode = LinkedList(data, 0, outerLen, true);
+          
             LightList<int> triangles = output ?? new LightList<int>();
 
             if (outerNode == null) {
@@ -39,10 +42,11 @@ namespace Vertigo {
             float maxY = float.NegativeInfinity;
             float invSize = default(float);
 
+
             if (hasHoles) {
                 outerNode = EliminateHoles(input, holeIndices, outerNode);
             }
-
+         
             // if the shape is not too simple, we'll use z-order curve hash later; calculate polygon bbox
             if (input.Count > 80 * 2) {
                 for (int i = 0; i < outerLen; i += 2) {
@@ -385,6 +389,7 @@ namespace Vertigo {
             }
 
             holeQueue.QuickClear();
+           
             return outerNode;
         }
 

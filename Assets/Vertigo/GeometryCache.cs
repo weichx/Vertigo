@@ -43,7 +43,7 @@ namespace Vertigo {
             texCoord1.EnsureAdditionalCapacity(vertCount);
             triangles.EnsureAdditionalCapacity(triCount);
         }
-       
+
         public bool SetVertexColors(int shapeIdx, Color color) {
             if (shapeIdx < 0 || shapeIdx > shapes.size) {
                 return false;
@@ -58,6 +58,32 @@ namespace Vertigo {
             }
 
             return true;
+        }
+
+        public bool SetNormals(int shapeIdx, Vector3 normal) {
+            if (shapeIdx < 0 || shapeIdx > shapes.size) {
+                return false;
+            }
+
+            GeometryShape shape = shapes[shapeIdx];
+            int start = shape.vertexStart;
+            int end = start + shape.vertexCount;
+            Vector3[] c = this.normals.array;
+            for (int i = start; i < end; i++) {
+                c[i] = normal;
+            }
+
+            return true;
+        }
+
+        public void Clear() {
+            shapes.QuickClear();
+            positions.QuickClear();
+            normals.QuickClear();
+            colors.QuickClear();
+            texCoord0.QuickClear();
+            texCoord1.QuickClear();
+            triangles.QuickClear();
         }
 
     }

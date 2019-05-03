@@ -33,6 +33,10 @@ namespace Vertigo {
 
         }
 
+        public void SetMiterLimit(int miterLimit) {
+            this.renderState.miterLimit = miterLimit;
+        }
+
         public void SetLineCap(LineCap lineCap) {
             this.renderState.lineCap = lineCap;
         }
@@ -116,10 +120,10 @@ namespace Vertigo {
             });
         }
 
-        public GeometryCache Fill(ShapeGenerator shapeGenerator) {
+        public GeometryCache Fill(ShapeGenerator shapeGenerator, GeometryCache retn = null) {
             int shapeCount = shapeGenerator.shapes.Count;
             ShapeGenerator.ShapeDef[] shapes = shapeGenerator.shapes.array;
-            GeometryCache retn = new GeometryCache();
+            retn = retn ?? new GeometryCache();
 
             for (int i = 0; i < shapeCount; i++) {
                 ShapeGenerator.ShapeDef shape = shapes[i];
@@ -148,7 +152,7 @@ namespace Vertigo {
 
                         int startVert = retn.vertexCount;
                         int startTriangle = retn.triangleCount;
-                        
+
                         Vector3[] positions = retn.positions.array;
                         Vector3[] normals = retn.normals.array;
                         Color[] colors = retn.colors.array;
@@ -181,16 +185,16 @@ namespace Vertigo {
                             triangleStart = startTriangle,
                             triangleCount = 6
                         });
-                        
+
                         int vertexCount = startVert + 4;
-                        
+
                         triangles[startTriangle + 0] = vertexCount + 0;
                         triangles[startTriangle + 1] = vertexCount + 1;
                         triangles[startTriangle + 2] = vertexCount + 2;
                         triangles[startTriangle + 3] = vertexCount + 2;
                         triangles[startTriangle + 4] = vertexCount + 3;
                         triangles[startTriangle + 5] = vertexCount + 0;
-                      
+
                         retn.positions.size += 4;
                         retn.normals.size += 4;
                         retn.colors.size += 4;
@@ -272,7 +276,7 @@ namespace Vertigo {
                             triangleStart = startTriangle,
                             triangleCount = 6
                         });
-                        
+
                         int vertexCount = startVert + 4;
                         triangles[startTriangle + 0] = vertexCount + 0;
                         triangles[startTriangle + 1] = vertexCount + 1;
@@ -280,14 +284,14 @@ namespace Vertigo {
                         triangles[startTriangle + 3] = vertexCount + 2;
                         triangles[startTriangle + 4] = vertexCount + 3;
                         triangles[startTriangle + 5] = vertexCount + 0;
-                      
+
                         retn.positions.size += 4;
                         retn.normals.size += 4;
                         retn.colors.size += 4;
                         retn.texCoord0.size += 4;
                         retn.texCoord1.size += 4;
                         retn.triangles.size += 6;
-                        
+
                         break;
                     }
 
@@ -326,7 +330,7 @@ namespace Vertigo {
                         float maxX = shape.bounds.xMax;
                         float minY = shape.bounds.yMin;
                         float maxY = shape.bounds.yMax;
-                        
+
                         Vector3 normal = new Vector3(0, 0, -1);
 
                         for (int j = pointRangeStart; j < pointRangeEnd; j++) {
@@ -344,7 +348,6 @@ namespace Vertigo {
                         }
 
                         for (int j = holeRangeStart; j < holeRangeEnd; j++) {
-
                             if ((holes[j].flags & ShapeGenerator.PointFlag.HoleStart) != 0) {
                                 s_IntScratch0.Add(vertexIdx);
                             }
@@ -387,13 +390,14 @@ namespace Vertigo {
                         retn.texCoord0.size = vertexIdx;
                         retn.texCoord1.size = vertexIdx;
                         retn.triangles.size = triangleIdx;
-                        
+
                         retn.shapes.Add(new GeometryShape() {
                             vertexStart = vertexStart,
                             vertexCount = retn.vertexCount - vertexStart,
                             triangleStart = triangleStart,
                             triangleCount = retn.triangleCount - triangleStart
                         });
+
 
                         break;
                     }
@@ -493,7 +497,684 @@ namespace Vertigo {
 
         public void Dash(ShapeGenerator shape) { }
 
-        public void Stroke(ShapeGenerator shape) { }
+        public void Stroke(ShapeGenerator shapeGenerator, GeometryCache retn = null) {
+            int shapeCount = shapeGenerator.shapes.Count;
+            ShapeGenerator.ShapeDef[] shapes = shapeGenerator.shapes.array;
+            retn = retn ?? new GeometryCache();
+
+            for (int i = 0; i < shapeCount; i++) {
+                switch (shapes[i].shapeType) {
+                    case ShapeType.Rect:
+                        break;
+                    case ShapeType.RoundedRect:
+                        break;
+                    case ShapeType.Circle:
+                        break;
+                    case ShapeType.Ellipse:
+                        break;
+                    case ShapeType.Triangle:
+                        break;
+                    case ShapeType.Other:
+                        break;
+                    case ShapeType.Unset:
+                        break;
+                    case ShapeType.Path:
+                        StrokeOpenPath(shapeGenerator.points, shapeGenerator.shapes[i], retn);
+                        retn.SetVertexColors(i, renderState.strokeColor);
+                        retn.SetNormals(i, new Vector3(0, 0, -1));
+                        break;
+                    case ShapeType.ClosedPath:
+                        StrokeClosedPath(shapeGenerator.points, shapeGenerator.shapes[i], retn);
+                        retn.SetVertexColors(i, renderState.strokeColor);
+                        retn.SetNormals(i, new Vector3(0, 0, -1));
+                        break;
+                    case ShapeType.Polygon:
+                        break;
+                    case ShapeType.Rhombus:
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+        }
+
+        private readonly StructList<Vector2> s_ScratchVector2 = new StructList<Vector2>(32);
+
+        private void StrokeOpenPath(StructList<ShapeGenerator.PathPoint> pathPoints, in ShapeGenerator.ShapeDef shape, GeometryCache retn) {
+            if (shape.pathDef.pointRange.length < 2) {
+                return;
+            }
+
+            float halfStrokeWidth = renderState.strokeWidth * 0.5f;
+            LineJoin join = renderState.lineJoin;
+            int miterLimit = renderState.miterLimit;
+
+            int vertexStart = retn.vertexCount;
+            int triangleCount = retn.triangleCount;
+
+            ComputeOpenPathSegments(shape.pathDef.pointRange, pathPoints, s_ScratchVector2);
+            int count = s_ScratchVector2.size;
+            Vector2[] midpoints = s_ScratchVector2.array;
+
+            ShapeGenerator.PathPoint[] pathPointArray = pathPoints.array;
+
+
+            EnsureCapacityForStrokeTriangles(retn, join, count / 2);
+
+            for (int i = 1; i < count; i++) {
+                CreateStrokeTriangles(retn, midpoints[i - 1], pathPointArray[i].position, midpoints[i], halfStrokeWidth, join, miterLimit);
+            }
+
+            if (renderState.lineCap == LineCap.Round) {
+                // todo 
+            }
+            else if (renderState.lineCap == LineCap.TriangleOut) {
+                Vector2 start = pathPointArray[shape.pathDef.pointRange.start + 0].position;
+                Vector2 next = pathPointArray[shape.pathDef.pointRange.start + 1].position;
+                Vector2 fromNext = (start - next).normalized;
+                retn.EnsureAdditionalCapacity(3, 3);
+
+                Vector2 perp = new Vector2(-fromNext.y, fromNext.x);
+                int vertexCount = retn.vertexCount;
+
+                retn.positions.AddUnsafe(start + (perp * halfStrokeWidth));
+                retn.positions.AddUnsafe(start - (perp * halfStrokeWidth));
+                retn.positions.AddUnsafe(start + (fromNext * halfStrokeWidth));
+
+                retn.triangles.AddUnsafe(vertexCount + 0);
+                retn.triangles.AddUnsafe(vertexCount + 1);
+                retn.triangles.AddUnsafe(vertexCount + 2);
+            }
+            else if (renderState.lineCap == LineCap.TriangleIn) {
+                Vector2 start = pathPointArray[shape.pathDef.pointRange.start + 0].position;
+                Vector2 next = pathPointArray[shape.pathDef.pointRange.start + 1].position;
+                Vector2 fromNext = (start - next).normalized;
+                retn.EnsureAdditionalCapacity(6, 6);
+
+                Vector2 perp = new Vector2(-fromNext.y, fromNext.x);
+                int vertexCount = retn.vertexCount;
+
+                retn.positions.AddUnsafe(start);
+                retn.positions.AddUnsafe(start + (fromNext * halfStrokeWidth) + (perp * halfStrokeWidth));
+                retn.positions.AddUnsafe(start + (perp * halfStrokeWidth));
+
+                retn.positions.AddUnsafe(start);
+                retn.positions.AddUnsafe(start + (fromNext * halfStrokeWidth) - (perp * halfStrokeWidth));
+                retn.positions.AddUnsafe(start + (perp * -halfStrokeWidth));
+
+                retn.triangles.AddUnsafe(vertexCount + 0);
+                retn.triangles.AddUnsafe(vertexCount + 1);
+                retn.triangles.AddUnsafe(vertexCount + 2);
+
+                retn.triangles.AddUnsafe(vertexCount + 3);
+                retn.triangles.AddUnsafe(vertexCount + 4);
+                retn.triangles.AddUnsafe(vertexCount + 5);
+            }
+            else if (renderState.lineCap == LineCap.Square) {
+                Vector2 start = pathPointArray[shape.pathDef.pointRange.start + 0].position;
+                Vector2 next = pathPointArray[shape.pathDef.pointRange.start + 1].position;
+                Vector2 fromNext = (start - next).normalized;
+                retn.EnsureAdditionalCapacity(4, 6);
+
+                Vector2 perp = new Vector2(-fromNext.y, fromNext.x);
+                int vertexCount = retn.vertexCount;
+
+                retn.positions.AddUnsafe(start + (perp * halfStrokeWidth));
+                retn.positions.AddUnsafe(start - (perp * halfStrokeWidth));
+
+                retn.positions.AddUnsafe(start + (fromNext * halfStrokeWidth) + (perp * -halfStrokeWidth));
+                retn.positions.AddUnsafe(start + (fromNext * halfStrokeWidth) - (perp * -halfStrokeWidth));
+
+                retn.triangles.AddUnsafe(vertexCount + 0);
+                retn.triangles.AddUnsafe(vertexCount + 1);
+                retn.triangles.AddUnsafe(vertexCount + 2);
+                retn.triangles.AddUnsafe(vertexCount + 2);
+                retn.triangles.AddUnsafe(vertexCount + 3);
+                retn.triangles.AddUnsafe(vertexCount + 0);
+            }
+
+            retn.shapes.Add(new GeometryShape() {
+                vertexStart = vertexStart,
+                vertexCount = retn.vertexCount,
+                triangleStart = triangleCount,
+                triangleCount = retn.triangleCount
+            });
+        }
+
+        private void StrokeClosedPath(StructList<ShapeGenerator.PathPoint> pathPoints, in ShapeGenerator.ShapeDef shape, GeometryCache retn) {
+            if (shape.pathDef.pointRange.length < 2) {
+                return;
+            }
+
+            float halfStrokeWidth = renderState.strokeWidth * 0.5f;
+            LineJoin join = renderState.lineJoin;
+            int miterLimit = renderState.miterLimit;
+
+            int vertexStart = retn.vertexCount;
+            int triangleCount = retn.triangleCount;
+
+            ComputeClosedPathSegments(shape.pathDef.pointRange, pathPoints, s_ScratchVector2);
+
+            int count = s_ScratchVector2.size;
+            Vector2[] points = s_ScratchVector2.array;
+
+            EnsureCapacityForStrokeTriangles(retn, join, count / 2);
+
+            for (int i = 0; i < count - 2; i += 2) {
+                CreateStrokeTriangles(retn, points[i], points[i + 1], points[i + 2], halfStrokeWidth, join, miterLimit);
+            }
+
+            retn.shapes.Add(new GeometryShape() {
+                vertexStart = vertexStart,
+                vertexCount = retn.vertexCount,
+                triangleStart = triangleCount,
+                triangleCount = retn.triangleCount
+            });
+        }
+
+        private void ComputeClosedPathSegments(RangeInt range, StructList<ShapeGenerator.PathPoint> points, StructList<Vector2> segments) {
+            ShapeGenerator.PathPoint[] pointData = points.array;
+            int start = range.start + 1;
+            int end = range.end - 1;
+            segments.EnsureCapacity(range.length * 2);
+            segments.size = 0;
+            int ptIdx = 0;
+
+            // find first mid point
+            Vector2 p0 = pointData[start - 1].position;
+            Vector2 m0 = (p0 + pointData[start].position) * 0.5f;
+
+            segments[ptIdx++] = m0;
+
+            for (int i = start; i < end; i++) {
+                Vector2 current = pointData[i + 0].position;
+                Vector2 next = pointData[i + 1].position;
+                segments[ptIdx++] = current;
+                segments[ptIdx++] = (current + next) * 0.5f;
+            }
+
+            segments[ptIdx++] = points[end].position;
+            segments[ptIdx++] = (points[end].position + p0) * 0.5f;
+            segments[ptIdx++] = p0;
+            segments[ptIdx++] = m0;
+
+            segments.size = ptIdx;
+        }
+
+        private void ComputeOpenPathSegments(RangeInt range, StructList<ShapeGenerator.PathPoint> points, StructList<Vector2> midpoints) {
+            int count = range.length - 2;
+            int ptIdx = 0;
+            ShapeGenerator.PathPoint[] pointData = points.array;
+
+            midpoints.EnsureCapacity(count + 2);
+            midpoints.size = 0;
+
+            Vector2[] data = midpoints.array;
+
+            data[ptIdx].x = points[0].position.x;
+            data[ptIdx].y = points[0].position.y;
+            ptIdx++;
+
+            int start = range.start + 1;
+            int end = range.start + count;
+
+            for (int i = start; i < end; i++) {
+                Vector2 p0 = pointData[i + 0].position;
+                Vector2 p1 = pointData[i + 1].position;
+                data[ptIdx].x = (p0.x + p1.x) * 0.5f;
+                data[ptIdx].y = (p0.y + p1.y) * 0.5f;
+                ptIdx++;
+            }
+
+            data[ptIdx].x = points[end + 1].position.x;
+            data[ptIdx].y = points[end + 1].position.y;
+            midpoints.size = ptIdx + 1;
+        }
+
+        private void EnsureCapacityForStrokeTriangles(GeometryCache retn, LineJoin lineJoin, int segmentCount) {
+            // 4 before join 
+            // 4 after join
+            // 3 - 6 for miter / bevel
+            // ? for round, guessing about 16 but who won't know until we hit that case
+            int beforeJoinSize = 4 * segmentCount;
+            int afterJoinSize = 4 * segmentCount;
+            if (lineJoin == LineJoin.Bevel || lineJoin == LineJoin.Miter || lineJoin == LineJoin.MiterClip) {
+                int size = beforeJoinSize + afterJoinSize + (6 * segmentCount);
+                retn.EnsureAdditionalCapacity(size, (int) (size * 1.5));
+            }
+            else {
+                int size = beforeJoinSize + afterJoinSize + (16 * segmentCount);
+                retn.EnsureAdditionalCapacity(size, (int) (size * 1.5));
+            }
+        }
+
+        private void CreateStrokeTriangles(GeometryCache retn, Vector2 p0, Vector2 p1, Vector2 p2, float strokeWidth, LineJoin joinType, int miterLimit) {
+            Vector2 t0 = p1 - p0;
+            Vector2 t2 = p2 - p1;
+
+            float tempX = t0.x;
+            t0.x = -t0.y;
+            t0.y = tempX;
+
+            tempX = t2.x;
+            t2.x = -t2.y;
+            t2.y = tempX;
+
+            float signedArea = (p1.x - p0.x) * (p2.y - p0.y) - (p2.x - p0.x) * (p1.y - p0.y);
+
+            // invert if signed area > 0
+            if (signedArea > 0) {
+                t0.x = -t0.x;
+                t0.y = -t0.y;
+                t2.x = -t2.x;
+                t2.y = -t2.y;
+            }
+
+            t0 = t0.normalized;
+            t2 = t2.normalized;
+
+            t0 *= strokeWidth;
+            t2 *= strokeWidth;
+
+            Vector2 intersection = default;
+            Vector2 anchor = default;
+            float anchorLength = float.MaxValue;
+
+            bool intersecting = LineIntersect(t0 + p0, t0 + p1, t2 + p2, t2 + p1, out intersection);
+
+            if (intersecting) {
+                anchor = intersection - p1;
+                anchorLength = anchor.magnitude;
+            }
+
+            int dd = (int) (anchorLength / strokeWidth);
+
+            Vector2 p0p1 = p0 - p1;
+            float p0p1Length = p0p1.magnitude;
+
+            Vector2 p1p2 = p1 - p2;
+            float p1p2Length = p1p2.magnitude;
+
+            int vertIdx = retn.vertexCount;
+            int triangleIdx = retn.triangleCount;
+            int[] triangles = retn.triangles.array;
+            Vector3[] positions = retn.positions.array;
+//            Color[] colors = retn.colors.array;
+
+            // todo -- texcoords & sdf packing
+            // todo -- remove color assignments, just for debugging
+            // todo -- fix reversed triangles, this only works w/ culling off right now
+            // todo -- fix overdraw cases where possible
+            // todo -- use burst & jobs
+
+            // can't use the miter a s reference point
+            if (anchorLength > p0p1Length || anchorLength > p1p2Length) {
+                Vector2 v0 = p0 - t0;
+                Vector2 v1 = p0 + t0;
+                Vector2 v2 = p1 + t0;
+                Vector2 v3 = p1 - t0;
+
+                Vector2 v4 = p2 + t2;
+                Vector2 v5 = p1 + t2;
+                Vector2 v6 = p1 - t2;
+                Vector2 v7 = p2 - t2;
+
+//                colors[vertIdx + 0] = Color.red;
+//                colors[vertIdx + 1] = Color.red;
+//                colors[vertIdx + 2] = Color.red;
+//                colors[vertIdx + 3] = Color.red;
+
+                positions[vertIdx + 0] = v0;
+                positions[vertIdx + 1] = v1;
+                positions[vertIdx + 2] = v2;
+                positions[vertIdx + 3] = v3;
+
+                triangles[triangleIdx + 0] = vertIdx + 0;
+                triangles[triangleIdx + 1] = vertIdx + 1;
+                triangles[triangleIdx + 2] = vertIdx + 2;
+                triangles[triangleIdx + 3] = vertIdx + 2;
+                triangles[triangleIdx + 4] = vertIdx + 3;
+                triangles[triangleIdx + 5] = vertIdx + 0;
+
+                vertIdx += 4;
+                triangleIdx += 6;
+
+                if (joinType == LineJoin.Round) {
+                    // generating unknown geometry in the cap function, have to write out our book keeping
+                    retn.positions.size = vertIdx;
+                    retn.normals.size = vertIdx;
+                    retn.colors.size = vertIdx;
+                    retn.texCoord0.size = vertIdx;
+                    retn.texCoord1.size = vertIdx;
+                    retn.triangles.size = triangleIdx;
+
+                    CreateRoundCap(retn, Color.white, p1, v2, v5, p2);
+                    vertIdx = retn.vertexCount;
+                    triangleIdx = retn.triangleCount;
+
+                    positions = retn.positions.array;
+                    triangles = retn.triangles.array;
+//                    colors = retn.colors.array;
+                }
+                else if (joinType == LineJoin.Bevel || joinType == LineJoin.Miter && dd >= miterLimit) {
+                    positions[vertIdx + 0] = v2;
+                    positions[vertIdx + 1] = p1;
+                    positions[vertIdx + 2] = v5;
+
+//                    colors[vertIdx + 0] = Color.yellow;
+//                    colors[vertIdx + 1] = Color.yellow;
+//                    colors[vertIdx + 2] = Color.yellow;
+
+                    triangles[triangleIdx + 0] = vertIdx + 0;
+                    triangles[triangleIdx + 1] = vertIdx + 1;
+                    triangles[triangleIdx + 2] = vertIdx + 2;
+
+                    vertIdx += 3;
+                    triangleIdx += 3;
+                }
+                else if (joinType == LineJoin.Miter && dd < miterLimit && intersecting) {
+                    positions[vertIdx + 0] = v2;
+                    positions[vertIdx + 1] = intersection;
+                    positions[vertIdx + 2] = v5;
+                    positions[vertIdx + 3] = p1;
+
+//                    colors[vertIdx + 0] = Color.yellow;
+//                    colors[vertIdx + 1] = Color.yellow;
+//                    colors[vertIdx + 2] = Color.yellow;
+//                    colors[vertIdx + 3] = Color.yellow;
+
+                    triangles[triangleIdx + 0] = vertIdx + 0;
+                    triangles[triangleIdx + 1] = vertIdx + 1;
+                    triangles[triangleIdx + 2] = vertIdx + 2;
+                    triangles[triangleIdx + 3] = vertIdx + 2;
+                    triangles[triangleIdx + 4] = vertIdx + 3;
+                    triangles[triangleIdx + 5] = vertIdx + 0;
+
+                    vertIdx += 4;
+                    triangleIdx += 6;
+                }
+
+                positions[vertIdx + 0] = v4;
+                positions[vertIdx + 1] = v5;
+                positions[vertIdx + 2] = v6;
+                positions[vertIdx + 3] = v7;
+
+//                colors[vertIdx + 0] = Color.red;
+//                colors[vertIdx + 1] = Color.red;
+//                colors[vertIdx + 2] = Color.red;
+//                colors[vertIdx + 3] = Color.red;
+
+                triangles[triangleIdx + 0] = vertIdx + 0;
+                triangles[triangleIdx + 1] = vertIdx + 1;
+                triangles[triangleIdx + 2] = vertIdx + 2;
+                triangles[triangleIdx + 3] = vertIdx + 2;
+                triangles[triangleIdx + 4] = vertIdx + 3;
+                triangles[triangleIdx + 5] = vertIdx + 0;
+
+                vertIdx += 4;
+                triangleIdx += 6;
+            }
+            else {
+                Vector2 v0 = p1 - anchor;
+                Vector2 v1 = p0 - t0;
+                Vector2 v2 = p0 + t0;
+                Vector2 v3 = p1 + t0;
+
+                Vector2 v4 = v0;
+                Vector2 v5 = p1 + t2;
+                Vector2 v6 = p2 + t2;
+                Vector2 v7 = p2 - t2;
+
+                positions[vertIdx + 0] = v0;
+                positions[vertIdx + 1] = v1;
+                positions[vertIdx + 2] = v2;
+                positions[vertIdx + 3] = v3;
+
+//                colors[vertIdx + 0] = Color.white;
+//                colors[vertIdx + 1] = Color.white;
+//                colors[vertIdx + 2] = Color.white;
+//                colors[vertIdx + 3] = Color.white;
+
+                triangles[triangleIdx + 0] = vertIdx + 0;
+                triangles[triangleIdx + 1] = vertIdx + 1;
+                triangles[triangleIdx + 2] = vertIdx + 2;
+                triangles[triangleIdx + 3] = vertIdx + 2;
+                triangles[triangleIdx + 4] = vertIdx + 3;
+                triangles[triangleIdx + 5] = vertIdx + 0;
+
+                vertIdx += 4;
+                triangleIdx += 6;
+
+                if (joinType == LineJoin.Round) {
+                    // generating unknown geometry in the cap function, have to write out our book keeping
+
+                    positions[vertIdx + 0] = v3;
+                    positions[vertIdx + 1] = p1; // + t2;
+                    positions[vertIdx + 2] = v0;
+
+//                    colors[vertIdx + 0] = Color.yellow;
+//                    colors[vertIdx + 1] = Color.yellow;
+//                    colors[vertIdx + 2] = Color.yellow;
+
+                    triangles[triangleIdx + 0] = vertIdx + 0;
+                    triangles[triangleIdx + 1] = vertIdx + 1;
+                    triangles[triangleIdx + 2] = vertIdx + 2;
+
+                    vertIdx += 3;
+                    triangleIdx += 3;
+
+                    retn.positions.size = vertIdx;
+                    retn.normals.size = vertIdx;
+                    retn.colors.size = vertIdx;
+                    retn.texCoord0.size = vertIdx;
+                    retn.texCoord1.size = vertIdx;
+                    retn.triangles.size = triangleIdx;
+
+                    CreateRoundCap(retn, Color.white, p1, v3, p1 + t2, v0);
+
+                    vertIdx = retn.vertexCount;
+                    triangleIdx = retn.triangleCount;
+
+                    positions = retn.positions.array;
+                    triangles = retn.triangles.array;
+//                    colors = retn.colors.array;
+
+                    positions[vertIdx + 0] = p1 - anchor;
+                    positions[vertIdx + 1] = p1;
+                    positions[vertIdx + 2] = p1 + t2;
+//
+//                    colors[vertIdx + 0] = Color.yellow;
+//                    colors[vertIdx + 1] = Color.yellow;
+//                    colors[vertIdx + 2] = Color.yellow;
+
+                    triangles[triangleIdx + 0] = vertIdx + 0;
+                    triangles[triangleIdx + 1] = vertIdx + 1;
+                    triangles[triangleIdx + 2] = vertIdx + 2;
+
+                    vertIdx += 3;
+                    triangleIdx += 3;
+                }
+                else {
+                    if (joinType == LineJoin.Bevel || joinType == LineJoin.Miter && dd >= miterLimit) {
+                        positions[vertIdx + 0] = p1 + t2;
+                        positions[vertIdx + 1] = p1 - anchor;
+                        positions[vertIdx + 2] = p1 + t0;
+//
+//                        colors[vertIdx + 0] = Color.yellow;
+//                        colors[vertIdx + 1] = Color.yellow;
+//                        colors[vertIdx + 2] = Color.yellow;
+
+                        triangles[triangleIdx + 0] = vertIdx + 0;
+                        triangles[triangleIdx + 1] = vertIdx + 1;
+                        triangles[triangleIdx + 2] = vertIdx + 2;
+
+                        vertIdx += 3;
+                        triangleIdx += 3;
+                    }
+                    else if (joinType == LineJoin.Miter && dd < miterLimit) {
+                        // todo -- convert to quad
+
+                        positions[vertIdx + 0] = p1 + t2;
+                        positions[vertIdx + 1] = p1 - anchor;
+                        positions[vertIdx + 2] = p1 + t0;
+//
+//                        colors[vertIdx + 0] = Color.yellow;
+//                        colors[vertIdx + 1] = Color.yellow;
+//                        colors[vertIdx + 2] = Color.yellow;
+
+                        triangles[triangleIdx + 0] = vertIdx + 0;
+                        triangles[triangleIdx + 1] = vertIdx + 1;
+                        triangles[triangleIdx + 2] = vertIdx + 2;
+
+                        vertIdx += 3;
+                        triangleIdx += 3;
+
+                        positions[vertIdx + 0] = p1 + t0;
+                        positions[vertIdx + 1] = p1 + t2;
+                        positions[vertIdx + 2] = intersection;
+
+//                        colors[vertIdx + 0] = Color.yellow;
+//                        colors[vertIdx + 1] = Color.yellow;
+//                        colors[vertIdx + 2] = Color.yellow;
+
+                        triangles[triangleIdx + 0] = vertIdx + 0;
+                        triangles[triangleIdx + 1] = vertIdx + 1;
+                        triangles[triangleIdx + 2] = vertIdx + 2;
+
+                        vertIdx += 3;
+                        triangleIdx += 3;
+                    }
+                }
+
+                positions[vertIdx + 0] = v4;
+                positions[vertIdx + 1] = v5;
+                positions[vertIdx + 2] = v6;
+                positions[vertIdx + 3] = v7;
+
+//                colors[vertIdx + 0] = Color.white;
+//                colors[vertIdx + 1] = Color.white;
+//                colors[vertIdx + 2] = Color.white;
+//                colors[vertIdx + 3] = Color.white;
+
+                triangles[triangleIdx + 0] = vertIdx + 0;
+                triangles[triangleIdx + 1] = vertIdx + 1;
+                triangles[triangleIdx + 2] = vertIdx + 2;
+                triangles[triangleIdx + 3] = vertIdx + 2;
+                triangles[triangleIdx + 4] = vertIdx + 3;
+                triangles[triangleIdx + 5] = vertIdx + 0;
+
+                vertIdx += 4;
+                triangleIdx += 6;
+            }
+
+            retn.positions.size = vertIdx;
+            retn.normals.size = vertIdx;
+            retn.colors.size = vertIdx;
+            retn.texCoord0.size = vertIdx;
+            retn.texCoord1.size = vertIdx;
+            retn.triangles.size = triangleIdx;
+        }
+
+        private void CreateRoundCap(GeometryCache retn, in Color color, in Vector2 center, in Vector2 p0, in Vector2 p1, in Vector2 nextInLine) {
+            const float Epsilon = 0.0001f;
+            float radius = (center - p0).magnitude;
+            float angle0 = math.atan2(p1.y - center.y, p1.x - center.x);
+            float angle1 = math.atan2(p0.y - center.y, p0.x - center.x);
+            float originalAngle = angle0;
+            if (angle1 > angle0) {
+                if (angle1 - angle0 >= Math.PI - 0.0001) {
+                    angle1 -= 2 * Mathf.PI;
+                }
+            }
+            else {
+                if (angle0 - angle1 >= Math.PI - 0.0001) {
+                    angle0 -= 2 * Mathf.PI;
+                }
+            }
+
+            float angleDiff = angle1 - angle0;
+            if (math.abs(angleDiff) >= Mathf.PI - Epsilon && math.abs(angleDiff) <= Mathf.PI + Epsilon) {
+                Vector2 r1 = center - nextInLine;
+                if (r1.x == 0) {
+                    if (r1.y > 0) {
+                        angleDiff = -angleDiff;
+                    }
+                }
+                else if (r1.x >= -Epsilon) {
+                    angleDiff = -angleDiff;
+                }
+            }
+
+            int segmentCount = (int) (math.abs(angleDiff * radius) / 5) + 1;
+
+            float angleInc = angleDiff / segmentCount;
+
+            int vertexCount = retn.vertexCount;
+            int triangleCount = retn.triangleCount;
+            int triIdx = triangleCount;
+            int vertIdx = vertexCount;
+
+            retn.EnsureAdditionalCapacity(segmentCount * 5, segmentCount * 5);
+
+            int[] triangles = retn.triangles.array;
+            Vector3[] positions = retn.positions.array;
+            Color[] colors = retn.colors.array;
+
+            // todo -- uvs
+            for (int i = 0; i < segmentCount; i++) {
+                colors[vertIdx] = color;
+                positions[vertIdx++] = new Vector3(center.x, center.y);
+
+                colors[vertIdx] = color;
+                positions[vertIdx++] = new Vector3(
+                    center.x + radius * math.cos(originalAngle + angleInc * i),
+                    center.y + radius * math.sin(originalAngle + angleInc * i)
+                );
+
+                colors[vertIdx] = color;
+                positions[vertIdx++] = new Vector3(
+                    center.x + radius * math.cos(originalAngle + angleInc * (1 + i)),
+                    center.y + radius * math.sin(originalAngle + angleInc * (1 + i))
+                );
+
+                triangles[triIdx++] = vertexCount + 0;
+                triangles[triIdx++] = vertexCount + 1;
+                triangles[triIdx++] = vertexCount + 2;
+                vertexCount += 3;
+            }
+
+            retn.positions.size = vertIdx;
+            retn.normals.size = vertIdx;
+            retn.colors.size = vertIdx;
+            retn.texCoord0.size = vertIdx;
+            retn.texCoord1.size = vertIdx;
+            retn.triangles.size = triIdx;
+        }
+
+        private static bool LineIntersect(in Vector2 p0, in Vector2 p1, in Vector2 p2, in Vector2 p3, out Vector2 intersection) {
+            const float Epsilon = 0.0001f;
+
+            float a0 = p1.y - p0.y;
+            float b0 = p0.x - p1.x;
+
+            float a1 = p3.y - p2.y;
+            float b1 = p2.x - p3.x;
+
+            float det = a0 * b1 - a1 * b0;
+            if (det > -Epsilon && det < Epsilon) {
+                intersection = default;
+                return false;
+            }
+            else {
+                float c0 = a0 * p0.x + b0 * p0.y;
+                float c1 = a1 * p2.x + b1 * p2.y;
+
+                float x = (b1 * c0 - b0 * c1) / det;
+                float y = (a0 * c1 - a1 * c0) / det;
+                intersection = new Vector2(x, y);
+                return true;
+            }
+        }
 
     }
 

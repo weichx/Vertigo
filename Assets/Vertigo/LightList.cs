@@ -168,6 +168,19 @@ namespace Vertigo {
                 return;
             }
 
+            if (collection is LightList<T> list) {
+                EnsureAdditionalCapacity(list.size);
+                System.Array.Copy(list.array, 0, array, size, list.size);
+                size += list.size;
+                return;
+            }
+            else if (collection is T[] cArray) {
+                EnsureAdditionalCapacity(cArray.Length);
+                System.Array.Copy(cArray, 0, array, size, cArray.Length);
+                size += cArray.Length;
+                return;
+            }
+            
             foreach (var item in collection) {
                 Add(item);
             }

@@ -16,6 +16,19 @@ public class VertigoBehaviorRoot : MonoBehaviour {
     private GeometryCache cache;
     public int segmentCount = 60;
 
+    public int miterLimit = 10;
+    public float strokeWidth = 60f;
+    public LineCap lineCap = LineCap.Butt;
+    public LineJoin lineJoin = LineJoin.Bevel;
+    public Color strokeColor = Color.white;
+    
+    public Vector2[] vector2s = {
+        new Vector2(0, 0),
+        new Vector2(100, 0),
+        new Vector2(100, 100),
+        new Vector2(0, 100)
+    };
+
     public void Start() {
         ctx = new VertigoContextOld();
         ctx2 = new VertigoContext();
@@ -30,24 +43,38 @@ public class VertigoBehaviorRoot : MonoBehaviour {
         cache = geo.Fill(shapeGen);
     }
 
+    public bool closed;
+
     public void Update() {
         camera.orthographicSize = Screen.height * 0.5f;
-        long start = GC.GetTotalMemory(false);
 
         ctx2.Clear();
-        shapeGen = new ShapeGenerator();
         shapeGen.Clear();
-                
-        shapeGen.BeginPath(100, 250);
-        shapeGen.CubicBezierTo(100, 100, 400, 100, 400, 250);
-        shapeGen.BeginHole(200, 200);
 
-        shapeGen.RectTo(220, 220);
-        shapeGen.CloseHole();
-        shapeGen.BeginHole(250, 200);
-        shapeGen.RectTo(width, height);
-        shapeGen.ClosePath();
-        
+        shapeGen.BeginPath(vector2s[0].x, vector2s[0].y);
+        for (int i = 1; i < vector2s.Length; i++) {
+            shapeGen.LineTo(vector2s[i].x, vector2s[i].y);
+        }
+
+//        shapeGen.LineTo(400, 500);
+//        shapeGen.LineTo(200, 100);
+//        shapeGen.CubicBezierTo(100, 100, 400, 100, 400, 250);
+//        
+//        shapeGen.BeginHole(200, 200);
+//
+//        shapeGen.RectTo(220, 220);
+//        shapeGen.CloseHole();
+//        
+//        shapeGen.BeginHole(250, 200);
+//        
+//        shapeGen.RectTo(width, height);
+        if (closed) {
+            shapeGen.ClosePath();
+        }
+        else {
+            shapeGen.EndPath();
+        }
+
 //        shapeGen.BeginPath(0, 0);
 //        shapeGen.LineTo(200, 0);
 //        
@@ -74,26 +101,27 @@ public class VertigoBehaviorRoot : MonoBehaviour {
 
 //        shapeGen.Rhombus(-300, 0, width, height);
 //        shapeGen.Triangle(0, -50, 100, 100, -100, 100);
-        cache = geo.Fill(shapeGen);
+        cache.Clear();
 
+        geo.SetLineCap(lineCap);
+        geo.SetLineJoin(lineJoin);
+        geo.SetStrokeWidth(strokeWidth);
+        geo.SetStrokeColor(strokeColor);
+        geo.SetMiterLimit(miterLimit);
+        geo.Stroke(shapeGen, cache);
         // fill rect | circle | whatever
 
         VertigoMaterial sharedMat = ctx2.materialPool.GetShared("VertigoSDF");
 
-        cache.SetVertexColors(0, Color.red);
+//        cache.SetVertexColors(0, Color.red);
+        ctx2.SetPosition(new Vector3(0, 0));
         ctx2.Draw(cache, sharedMat);
 
-        ctx2.SetPosition(new Vector3(200, 200));
 
 //        cache.SetVertexColors(0, Color.green);
 //        ctx2.Draw(cache, sharedMat);
 
         ctx2.Flush(camera);
-        long end = GC.GetTotalMemory(false);
-        if (end - start > 0) {
-            Debug.Log((end - start) + " allocated bytes");
-        }
-
     }
 
 }
