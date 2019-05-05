@@ -2,21 +2,17 @@ namespace Vertigo {
 
     public enum ShapeType {
 
+        Unset,
         Rect,
         RoundedRect,
         Circle,
         Ellipse,
         Path,
         Triangle,
-        Other,
-
-        Unset,
-
         ClosedPath,
-
         Polygon,
-
-        Rhombus
+        Rhombus,
+        Sprite
 
     }
 

@@ -12,6 +12,14 @@ namespace Vertigo {
         internal readonly LightList<VertigoMaterial> instances;
         internal bool isActive;
 
+        public VertigoMaterial(Material material) {
+            this.material = material;
+            this.keywords = null;
+            this.isActive = true;
+            this.parent = null;
+            this.instances = null;
+        }
+        
         internal VertigoMaterial(Material material, IList<string> keywords) {
             this.material = material;
             this.instances = new LightList<VertigoMaterial>(4);

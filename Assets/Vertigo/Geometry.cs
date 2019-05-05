@@ -44,8 +44,6 @@ namespace Vertigo {
                     break;
                 case ShapeType.Triangle:
                     break;
-                case ShapeType.Other:
-                    break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -166,8 +164,6 @@ namespace Vertigo {
                 case ShapeType.Path:
                     return;
                 case ShapeType.Triangle:
-                    return;
-                case ShapeType.Other:
                     return;
                 case ShapeType.Unset:
                     return;

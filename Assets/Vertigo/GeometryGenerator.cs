@@ -1,18 +1,18 @@
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using Unity.Mathematics;
+using UnityEditor.Sprites;
 using UnityEngine;
-using Debug = UnityEngine.Debug;
 
 namespace Vertigo {
 
     public class GeometryGenerator {
 
         private RenderState renderState;
-        private readonly LightList<int> s_IntScratch0 = new LightList<int>(32);
-        private readonly LightList<int> s_IntScratch1 = new LightList<int>(32);
-        private readonly LightList<float> s_FloatScratch = new LightList<float>(32);
+        private static readonly LightList<int> s_IntScratch0 = new LightList<int>(32);
+        private static readonly LightList<int> s_IntScratch1 = new LightList<int>(32);
+        private static readonly LightList<float> s_FloatScratch = new LightList<float>(32);
+        private static readonly StructList<Vector2> s_ScratchVector2 = new StructList<Vector2>(32);
+        private static readonly Vector3 DefaultNormal = new Vector3(0, 0, -1);
 
         public GeometryGenerator() {
             this.renderState.strokeWidth = 1f;
@@ -24,12 +24,12 @@ namespace Vertigo {
 
         public struct RenderState {
 
-            public Color32 strokeColor;
+            public Color strokeColor;
             public float strokeWidth;
             public LineCap lineCap;
             public LineJoin lineJoin;
             public int miterLimit;
-            public Color32 fillColor;
+            public Color fillColor;
 
         }
 
@@ -53,7 +53,7 @@ namespace Vertigo {
             renderState.strokeWidth = width;
         }
 
-        private static void FillRegularPolygon(GeometryCache retn, Color color, Vector3 position, float widthRadius, float heightRadius, int segmentCount) {
+        private static void FillRegularPolygon(GeometryCache retn, ShapeType shapeType, Color color, Vector3 position, float widthRadius, float heightRadius, int segmentCount) {
             Vector3 normal = new Vector3(0, 0, -1);
 
             int nPlus1 = segmentCount + 1;
@@ -113,6 +113,8 @@ namespace Vertigo {
             retn.triangles.size += triangleCount;
 
             retn.shapes.Add(new GeometryShape() {
+                shapeType = shapeType,
+                geometryType = GeometryType.Physical,
                 vertexStart = vertexStart,
                 vertexCount = vertexCount,
                 triangleStart = triangleStart,
@@ -120,12 +122,19 @@ namespace Vertigo {
             });
         }
 
-        public GeometryCache Fill(ShapeGenerator shapeGenerator, GeometryCache retn = null) {
-            int shapeCount = shapeGenerator.shapes.Count;
-            ShapeGenerator.ShapeDef[] shapes = shapeGenerator.shapes.array;
-            retn = retn ?? new GeometryCache();
+        public RangeInt Fill(ShapeGenerator shapeGenerator, RangeInt shapeRange, GeometryCache retn) {
 
-            for (int i = 0; i < shapeCount; i++) {
+            if (retn == null) {
+                return default;
+            }
+
+            int shapeStart = shapeRange.start;
+            int shapeEnd = shapeRange.end;
+
+            ShapeGenerator.ShapeDef[] shapes = shapeGenerator.shapes.array;
+            int geometryShapeStart = retn.shapeCount;
+            int geometryShapeCount = 0;
+            for (int i = shapeStart; i < shapeEnd; i++) {
                 ShapeGenerator.ShapeDef shape = shapes[i];
 
                 switch (shapes[i].shapeType) {
@@ -134,14 +143,14 @@ namespace Vertigo {
                         retn.EnsureAdditionalCapacity(4, 6);
 
                         float x = shape.p0.x;
-                        float y = -shape.p0.y;
+                        float y = shape.p0.y;
                         float width = shape.p1.x;
                         float height = shape.p1.y;
 
-                        Vector3 p0 = new Vector3(x, y);
-                        Vector3 p1 = new Vector3(x + width, y);
-                        Vector3 p2 = new Vector3(x + width, y + height);
-                        Vector3 p3 = new Vector3(x, y + height);
+                        Vector3 p0 = new Vector3(x, -y);
+                        Vector3 p1 = new Vector3(x + width, -y);
+                        Vector3 p2 = new Vector3(x + width, -(y + height));
+                        Vector3 p3 = new Vector3(x, -(y + height));
 
                         Vector3 n0 = new Vector3(0, 0, -1);
 
@@ -180,20 +189,20 @@ namespace Vertigo {
                         texCoord0[startVert + 3] = uv3;
 
                         retn.shapes.Add(new GeometryShape() {
+                            geometryType = GeometryType.Physical,
+                            shapeType = ShapeType.Rect,
                             vertexStart = startVert,
                             vertexCount = 4,
                             triangleStart = startTriangle,
                             triangleCount = 6
                         });
 
-                        int vertexCount = startVert + 4;
-
-                        triangles[startTriangle + 0] = vertexCount + 0;
-                        triangles[startTriangle + 1] = vertexCount + 1;
-                        triangles[startTriangle + 2] = vertexCount + 2;
-                        triangles[startTriangle + 3] = vertexCount + 2;
-                        triangles[startTriangle + 4] = vertexCount + 3;
-                        triangles[startTriangle + 5] = vertexCount + 0;
+                        triangles[startTriangle + 0] = startVert + 0;
+                        triangles[startTriangle + 1] = startVert + 1;
+                        triangles[startTriangle + 2] = startVert + 2;
+                        triangles[startTriangle + 3] = startVert + 2;
+                        triangles[startTriangle + 4] = startVert + 3;
+                        triangles[startTriangle + 5] = startVert + 0;
 
                         retn.positions.size += 4;
                         retn.normals.size += 4;
@@ -201,7 +210,7 @@ namespace Vertigo {
                         retn.texCoord0.size += 4;
                         retn.texCoord1.size += 4;
                         retn.triangles.size += 6;
-
+                        geometryShapeCount++;
                         break;
                     }
 
@@ -209,17 +218,20 @@ namespace Vertigo {
                         break;
 
                     case ShapeType.Circle: {
-                        FillRegularPolygon(retn, renderState.fillColor, shape.p0, shape.p1.x, shape.p1.x, (int) shape.p2.x);
+                        FillRegularPolygon(retn, ShapeType.Circle, renderState.fillColor, shape.p0, shape.p1.x, shape.p1.x, (int) shape.p2.x);
+                        geometryShapeCount++;
                         break;
                     }
 
                     case ShapeType.Ellipse: {
-                        FillRegularPolygon(retn, renderState.fillColor, shape.p0, shape.p1.x, shape.p1.y, (int) shape.p2.x);
+                        FillRegularPolygon(retn, ShapeType.Ellipse, renderState.fillColor, shape.p0, shape.p1.x, shape.p1.y, (int) shape.p2.x);
+                        geometryShapeCount++;
                         break;
                     }
 
                     case ShapeType.Polygon: {
-                        FillRegularPolygon(retn, renderState.fillColor, shape.p0, shape.p1.x, shape.p1.y, (int) shape.p2.x);
+                        FillRegularPolygon(retn, ShapeType.Polygon, renderState.fillColor, shape.p0, shape.p1.x, shape.p1.y, (int) shape.p2.x);
+                        geometryShapeCount++;
                         break;
                     }
 
@@ -271,6 +283,8 @@ namespace Vertigo {
                         texCoord0[startVert + 3] = uv3;
 
                         retn.shapes.Add(new GeometryShape() {
+                            shapeType = ShapeType.Rhombus,
+                            geometryType = GeometryType.Physical,
                             vertexStart = startVert,
                             vertexCount = 4,
                             triangleStart = startTriangle,
@@ -291,7 +305,7 @@ namespace Vertigo {
                         retn.texCoord0.size += 4;
                         retn.texCoord1.size += 4;
                         retn.triangles.size += 6;
-
+                        geometryShapeCount++;
                         break;
                     }
 
@@ -392,13 +406,14 @@ namespace Vertigo {
                         retn.triangles.size = triangleIdx;
 
                         retn.shapes.Add(new GeometryShape() {
+                            geometryType = GeometryType.Physical,
+                            shapeType = ShapeType.ClosedPath,
                             vertexStart = vertexStart,
                             vertexCount = retn.vertexCount - vertexStart,
                             triangleStart = triangleStart,
                             triangleCount = retn.triangleCount - triangleStart
                         });
-
-
+                        geometryShapeCount++;
                         break;
                     }
 
@@ -468,26 +483,21 @@ namespace Vertigo {
                         retn.triangles.size += 3;
 
                         retn.shapes.Add(new GeometryShape() {
+                            shapeType = ShapeType.Triangle,
+                            geometryType = GeometryType.Physical,
                             vertexStart = startVert,
                             vertexCount = 3,
                             triangleStart = startTriangle,
                             triangleCount = 3
                         });
-
+                        geometryShapeCount++;
                         break;
                     }
 
-                    case ShapeType.Other:
-                        break;
-                    case ShapeType.Unset:
-                        break;
-
-                    default:
-                        throw new ArgumentOutOfRangeException();
                 }
             }
 
-            return retn;
+            return new RangeInt(geometryShapeStart, geometryShapeCount);
         }
 
         private static float PercentOfRange(float v, float bottom, float top) {
@@ -504,6 +514,8 @@ namespace Vertigo {
 
             for (int i = 0; i < shapeCount; i++) {
                 switch (shapes[i].shapeType) {
+                    case ShapeType.Unset:
+                        break;
                     case ShapeType.Rect:
                         break;
                     case ShapeType.RoundedRect:
@@ -513,10 +525,6 @@ namespace Vertigo {
                     case ShapeType.Ellipse:
                         break;
                     case ShapeType.Triangle:
-                        break;
-                    case ShapeType.Other:
-                        break;
-                    case ShapeType.Unset:
                         break;
                     case ShapeType.Path:
                         StrokeOpenPath(shapeGenerator.points, shapeGenerator.shapes[i], retn);
@@ -538,44 +546,22 @@ namespace Vertigo {
             }
         }
 
-        private readonly StructList<Vector2> s_ScratchVector2 = new StructList<Vector2>(32);
-
-        private void StrokeOpenPath(StructList<ShapeGenerator.PathPoint> pathPoints, in ShapeGenerator.ShapeDef shape, GeometryCache retn) {
-            if (shape.pathDef.pointRange.length < 2) {
-                return;
-            }
-
+        private void GenerateStartCap(GeometryCache retn, ShapeGenerator.PathPoint[] pathPointArray, int startIdx) {
             float halfStrokeWidth = renderState.strokeWidth * 0.5f;
-            LineJoin join = renderState.lineJoin;
-            int miterLimit = renderState.miterLimit;
-
-            int vertexStart = retn.vertexCount;
-            int triangleCount = retn.triangleCount;
-
-            ComputeOpenPathSegments(shape.pathDef.pointRange, pathPoints, s_ScratchVector2);
-            int count = s_ScratchVector2.size;
-            Vector2[] midpoints = s_ScratchVector2.array;
-
-            ShapeGenerator.PathPoint[] pathPointArray = pathPoints.array;
-
-
-            EnsureCapacityForStrokeTriangles(retn, join, count / 2);
-
-            for (int i = 1; i < count; i++) {
-                CreateStrokeTriangles(retn, midpoints[i - 1], pathPointArray[i].position, midpoints[i], halfStrokeWidth, join, miterLimit);
-            }
+            Vector2 start = pathPointArray[startIdx + 0].position;
+            Vector2 next = pathPointArray[startIdx + 1].position;
+            start.y = -start.y;
+            next.y = -next.y;
+            Vector2 fromNext = (start - next).normalized;
+            Vector2 perp = new Vector2(-fromNext.y, fromNext.x);
+            int vertexCount = retn.vertexCount;
 
             if (renderState.lineCap == LineCap.Round) {
                 // todo 
             }
             else if (renderState.lineCap == LineCap.TriangleOut) {
-                Vector2 start = pathPointArray[shape.pathDef.pointRange.start + 0].position;
-                Vector2 next = pathPointArray[shape.pathDef.pointRange.start + 1].position;
-                Vector2 fromNext = (start - next).normalized;
-                retn.EnsureAdditionalCapacity(3, 3);
 
-                Vector2 perp = new Vector2(-fromNext.y, fromNext.x);
-                int vertexCount = retn.vertexCount;
+                retn.EnsureAdditionalCapacity(3, 3);
 
                 retn.positions.AddUnsafe(start + (perp * halfStrokeWidth));
                 retn.positions.AddUnsafe(start - (perp * halfStrokeWidth));
@@ -586,13 +572,8 @@ namespace Vertigo {
                 retn.triangles.AddUnsafe(vertexCount + 2);
             }
             else if (renderState.lineCap == LineCap.TriangleIn) {
-                Vector2 start = pathPointArray[shape.pathDef.pointRange.start + 0].position;
-                Vector2 next = pathPointArray[shape.pathDef.pointRange.start + 1].position;
-                Vector2 fromNext = (start - next).normalized;
-                retn.EnsureAdditionalCapacity(6, 6);
 
-                Vector2 perp = new Vector2(-fromNext.y, fromNext.x);
-                int vertexCount = retn.vertexCount;
+                retn.EnsureAdditionalCapacity(6, 6);
 
                 retn.positions.AddUnsafe(start);
                 retn.positions.AddUnsafe(start + (fromNext * halfStrokeWidth) + (perp * halfStrokeWidth));
@@ -611,17 +592,11 @@ namespace Vertigo {
                 retn.triangles.AddUnsafe(vertexCount + 5);
             }
             else if (renderState.lineCap == LineCap.Square) {
-                Vector2 start = pathPointArray[shape.pathDef.pointRange.start + 0].position;
-                Vector2 next = pathPointArray[shape.pathDef.pointRange.start + 1].position;
-                Vector2 fromNext = (start - next).normalized;
-                retn.EnsureAdditionalCapacity(4, 6);
 
-                Vector2 perp = new Vector2(-fromNext.y, fromNext.x);
-                int vertexCount = retn.vertexCount;
+                retn.EnsureAdditionalCapacity(4, 6);
 
                 retn.positions.AddUnsafe(start + (perp * halfStrokeWidth));
                 retn.positions.AddUnsafe(start - (perp * halfStrokeWidth));
-
                 retn.positions.AddUnsafe(start + (fromNext * halfStrokeWidth) + (perp * -halfStrokeWidth));
                 retn.positions.AddUnsafe(start + (fromNext * halfStrokeWidth) - (perp * -halfStrokeWidth));
 
@@ -631,9 +606,146 @@ namespace Vertigo {
                 retn.triangles.AddUnsafe(vertexCount + 2);
                 retn.triangles.AddUnsafe(vertexCount + 3);
                 retn.triangles.AddUnsafe(vertexCount + 0);
+
             }
 
+            int finalVertexCount = retn.vertexCount;
+            retn.texCoord0.size = finalVertexCount;
+            retn.texCoord1.size = finalVertexCount;
+            retn.colors.size = finalVertexCount;
+            retn.normals.size = finalVertexCount;
+        }
+
+        private void GenerateEndCap(GeometryCache retn, ShapeGenerator.PathPoint[] pathPointArray, int endIndex) {
+            float halfStrokeWidth = renderState.strokeWidth * 0.5f;
+            Vector2 end = pathPointArray[endIndex - 1].position;
+            Vector2 prev = pathPointArray[endIndex - 2].position;
+            end.y = -end.y;
+            prev.y = -prev.y;
+
+            Vector2 fromPrev = (prev - end).normalized;
+            Vector2 perp = new Vector2(-fromPrev.y, fromPrev.x);
+            int vertexCount = retn.vertexCount;
+
+            if (renderState.lineCap == LineCap.Round) {
+//                 Vector2 center = end;
+//                 int segmentCount = (int) (math.abs(Math.PI * halfStrokeWidth) / 5) + 1;
+//
+//                 Vector3[] positions = retn.positions.array;
+//                 int vertIdx = retn.vertexCount;
+//                 int triIdx = retn.triangleCount;
+//                 int[] triangles = retn.triangles.array;
+//                 
+//                 float angleInc = 180f / segmentCount;      
+//                 
+//                 for (int i = 0; i < segmentCount; i++) {
+//                     
+//                     positions[vertIdx++] = new Vector3(center.x, center.y);
+//
+//                     positions[vertIdx++] = new Vector3(
+//                         center.x + halfStrokeWidth * math.cos(angleInc * i),
+//                         center.y + halfStrokeWidth * math.sin(angleInc * i)
+//                     );
+//
+//                     positions[vertIdx++] = new Vector3(
+//                         center.x + halfStrokeWidth * math.cos(angleInc * (1 + i)),
+//                         center.y + halfStrokeWidth * math.sin(angleInc * (1 + i))
+//                     );
+//
+//                     triangles[triIdx++] = vertexCount + 0;
+//                     triangles[triIdx++] = vertexCount + 1;
+//                     triangles[triIdx++] = vertexCount + 2;
+//                     vertexCount += 3;
+//                 }
+//                 
+            }
+            else if (renderState.lineCap == LineCap.TriangleOut) {
+
+                retn.EnsureAdditionalCapacity(3, 3);
+
+                retn.positions.AddUnsafe(end - (perp * halfStrokeWidth));
+                retn.positions.AddUnsafe(end + (perp * halfStrokeWidth));
+                retn.positions.AddUnsafe(end - (fromPrev * halfStrokeWidth));
+
+                retn.triangles.AddUnsafe(vertexCount + 0);
+                retn.triangles.AddUnsafe(vertexCount + 1);
+                retn.triangles.AddUnsafe(vertexCount + 2);
+            }
+            else if (renderState.lineCap == LineCap.TriangleIn) {
+
+                retn.EnsureAdditionalCapacity(6, 6);
+
+                retn.positions.AddUnsafe(end);
+                retn.positions.AddUnsafe(end - (fromPrev * halfStrokeWidth) - (perp * halfStrokeWidth));
+                retn.positions.AddUnsafe(end - (perp * halfStrokeWidth));
+
+                retn.positions.AddUnsafe(end);
+                retn.positions.AddUnsafe(end - (fromPrev * halfStrokeWidth) + (perp * halfStrokeWidth));
+                retn.positions.AddUnsafe(end - (perp * -halfStrokeWidth));
+
+                retn.triangles.AddUnsafe(vertexCount + 0);
+                retn.triangles.AddUnsafe(vertexCount + 1);
+                retn.triangles.AddUnsafe(vertexCount + 2);
+
+                retn.triangles.AddUnsafe(vertexCount + 3);
+                retn.triangles.AddUnsafe(vertexCount + 4);
+                retn.triangles.AddUnsafe(vertexCount + 5);
+            }
+            else if (renderState.lineCap == LineCap.Square) {
+                retn.EnsureAdditionalCapacity(4, 6);
+
+                retn.positions.AddUnsafe(end - (perp * halfStrokeWidth));
+                retn.positions.AddUnsafe(end + (perp * halfStrokeWidth));
+                retn.positions.AddUnsafe(end - (fromPrev * halfStrokeWidth) - (perp * -halfStrokeWidth));
+                retn.positions.AddUnsafe(end - (fromPrev * halfStrokeWidth) + (perp * -halfStrokeWidth));
+
+                retn.triangles.AddUnsafe(vertexCount + 0);
+                retn.triangles.AddUnsafe(vertexCount + 1);
+                retn.triangles.AddUnsafe(vertexCount + 2);
+                retn.triangles.AddUnsafe(vertexCount + 2);
+                retn.triangles.AddUnsafe(vertexCount + 3);
+                retn.triangles.AddUnsafe(vertexCount + 0);
+
+            }
+
+            int finalVertexCount = retn.vertexCount;
+            retn.normals.size = finalVertexCount;
+            retn.colors.size = finalVertexCount;
+            retn.texCoord0.size = finalVertexCount;
+            retn.texCoord1.size = finalVertexCount;
+        }
+
+        private void StrokeOpenPath(StructList<ShapeGenerator.PathPoint> pathPoints, in ShapeGenerator.ShapeDef shape, GeometryCache retn) {
+            if (shape.pathDef.pointRange.length < 2) {
+                return;
+            }
+
+            float halfStrokeWidth = renderState.strokeWidth * 0.5f;
+            LineJoin join = renderState.lineJoin;
+            int miterLimit = renderState.miterLimit;
+
+            int vertexStart = retn.vertexCount;
+            int triangleCount = retn.triangleCount;
+
+            ComputeOpenPathSegments(shape.pathDef.pointRange, pathPoints, s_ScratchVector2);
+            int count = s_ScratchVector2.size;
+            Vector2[] midpoints = s_ScratchVector2.array;
+
+            GenerateStartCap(retn, pathPoints.array, shape.pathDef.pointRange.start);
+
+            ShapeGenerator.PathPoint[] pathPointArray = pathPoints.array;
+
+            EnsureCapacityForStrokeTriangles(retn, join, count / 2);
+
+            for (int i = 1; i < count; i++) {
+                CreateStrokeTriangles(retn, midpoints[i - 1], pathPointArray[i].position, midpoints[i], halfStrokeWidth, join, miterLimit);
+            }
+
+            GenerateEndCap(retn, pathPoints.array, shape.pathDef.pointRange.end);
+
             retn.shapes.Add(new GeometryShape() {
+                geometryType = GeometryType.PhysicalStroke,
+                shapeType = ShapeType.Path,
                 vertexStart = vertexStart,
                 vertexCount = retn.vertexCount,
                 triangleStart = triangleCount,
@@ -665,6 +777,8 @@ namespace Vertigo {
             }
 
             retn.shapes.Add(new GeometryShape() {
+                shapeType = ShapeType.ClosedPath,
+                geometryType = GeometryType.PhysicalStroke,
                 vertexStart = vertexStart,
                 vertexCount = retn.vertexCount,
                 triangleStart = triangleCount,
@@ -749,6 +863,11 @@ namespace Vertigo {
         }
 
         private void CreateStrokeTriangles(GeometryCache retn, Vector2 p0, Vector2 p1, Vector2 p2, float strokeWidth, LineJoin joinType, int miterLimit) {
+
+            p0.y = -p0.y;
+            p1.y = -p1.y;
+            p2.y = -p2.y;
+
             Vector2 t0 = p1 - p0;
             Vector2 t2 = p2 - p1;
 
@@ -802,9 +921,9 @@ namespace Vertigo {
 //            Color[] colors = retn.colors.array;
 
             // todo -- texcoords & sdf packing
-            // todo -- remove color assignments, just for debugging
             // todo -- fix reversed triangles, this only works w/ culling off right now
             // todo -- fix overdraw cases where possible
+            // todo -- fix bad bending of joins at sharp angles
             // todo -- use burst & jobs
 
             // can't use the miter a s reference point
@@ -848,7 +967,7 @@ namespace Vertigo {
                     retn.texCoord1.size = vertIdx;
                     retn.triangles.size = triangleIdx;
 
-                    CreateRoundCap(retn, Color.white, p1, v2, v5, p2);
+                    CreateRoundJoin(retn, p1, v2, v5, p2);
                     vertIdx = retn.vertexCount;
                     triangleIdx = retn.triangleCount;
 
@@ -970,7 +1089,7 @@ namespace Vertigo {
                     retn.texCoord1.size = vertIdx;
                     retn.triangles.size = triangleIdx;
 
-                    CreateRoundCap(retn, Color.white, p1, v3, p1 + t2, v0);
+                    CreateRoundJoin(retn, p1, v3, p1 + t2, v0);
 
                     vertIdx = retn.vertexCount;
                     triangleIdx = retn.triangleCount;
@@ -1075,7 +1194,7 @@ namespace Vertigo {
             retn.triangles.size = triangleIdx;
         }
 
-        private void CreateRoundCap(GeometryCache retn, in Color color, in Vector2 center, in Vector2 p0, in Vector2 p1, in Vector2 nextInLine) {
+        private void CreateRoundJoin(GeometryCache retn, in Vector2 center, in Vector2 p0, in Vector2 p1, in Vector2 nextInLine) {
             const float Epsilon = 0.0001f;
             float radius = (center - p0).magnitude;
             float angle0 = math.atan2(p1.y - center.y, p1.x - center.x);
@@ -1118,20 +1237,16 @@ namespace Vertigo {
 
             int[] triangles = retn.triangles.array;
             Vector3[] positions = retn.positions.array;
-            Color[] colors = retn.colors.array;
 
-            // todo -- uvs
+            // todo -- can do fewer sin / cos if we precompute and store since its always next & prev
             for (int i = 0; i < segmentCount; i++) {
-                colors[vertIdx] = color;
                 positions[vertIdx++] = new Vector3(center.x, center.y);
 
-                colors[vertIdx] = color;
                 positions[vertIdx++] = new Vector3(
                     center.x + radius * math.cos(originalAngle + angleInc * i),
                     center.y + radius * math.sin(originalAngle + angleInc * i)
                 );
 
-                colors[vertIdx] = color;
                 positions[vertIdx++] = new Vector3(
                     center.x + radius * math.cos(originalAngle + angleInc * (1 + i)),
                     center.y + radius * math.sin(originalAngle + angleInc * (1 + i))
@@ -1174,6 +1289,103 @@ namespace Vertigo {
                 intersection = new Vector2(x, y);
                 return true;
             }
+        }
+
+        public void SetFillColor(Color32 color) {
+            renderState.fillColor = color;
+        }
+
+        public void ResetRenderState() {
+            renderState.lineCap = LineCap.Butt;
+            renderState.lineJoin = LineJoin.Miter;
+            renderState.fillColor = Color.black;
+            renderState.strokeColor = Color.white;
+            renderState.strokeWidth = 1f;
+        }
+
+        public void FillSprite(Sprite sprite, Rect rect, GeometryCache retn) {
+            VertigoUtil.SpriteData spriteData = VertigoUtil.GetSpriteData(sprite);
+            Vector2[] vertices = spriteData.vertices;
+            Vector2[] texCoords = spriteData.uvs;
+            ushort[] spriteTriangles = spriteData.triangles;
+
+            retn.EnsureAdditionalCapacity(vertices.Length, spriteData.triangles.Length);
+            Vector3[] positions = retn.positions.array;
+            Vector3[] normals = retn.normals.array;
+            Color[] colors = retn.colors.array;
+            Vector4[] texCoord0 = retn.texCoord0.array;
+            int[] triangles = retn.triangles.array;
+            int vertexStart = retn.vertexCount;
+            int triangleStart = retn.triangleCount;
+            int vertIdx = retn.vertexCount;
+            int triIdx = retn.triangleCount;
+            Vector2 pivot = sprite.pivot;
+            float ppi = sprite.pixelsPerUnit;
+            
+            for (int i = 0; i < vertices.Length; i++) {
+                positions[vertIdx].x = pivot.x - (vertices[i].x * ppi);
+                positions[vertIdx].y = (vertices[i].y * ppi) - pivot.y;
+                normals[vertIdx] = DefaultNormal;
+                colors[vertIdx] = renderState.fillColor;
+                texCoord0[vertIdx].x = texCoords[i].x;
+                texCoord0[vertIdx].y = texCoords[i].y; 
+                vertIdx++;
+            }
+
+            if (rect != default) {
+                vertIdx = vertexStart;
+                float minX = float.MaxValue;
+                float minY = float.MaxValue;
+                float maxX = float.MinValue;
+                float maxY = float.MinValue;
+                for (int i = 0; i < vertices.Length; i++) {
+                    float x = positions[vertIdx].x;
+                    float y = -positions[vertIdx].y;
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                    vertIdx++;
+                }
+
+                float boundsWidth = maxX - minX;
+                float boundsHeight = maxY - minY;
+                float baseX = rect.x;
+                float baseY = rect.y;
+                float targetWidth = rect.width;
+                float targetHeight = rect.height;
+                vertIdx = vertexStart;
+
+                for (int i = 0; i < vertices.Length; i++) {
+                    float x = positions[vertIdx].x;
+                    float y = positions[vertIdx].y;
+                    float percentX = PercentOfRange(x, minX, boundsWidth);
+                    float percentY = PercentOfRange(y, minY, boundsHeight);
+                    positions[vertIdx].x = baseX + (percentX * targetWidth);
+                    positions[vertIdx].y = (percentY * targetHeight) - baseY;
+                    vertIdx++;
+                }
+            }
+
+            for (int i = 0; i < spriteTriangles.Length; i++) {
+                triangles[triIdx++] = vertexStart + spriteTriangles[i];
+            }
+
+            retn.triangles.size = triIdx;
+            retn.positions.size = vertIdx;
+            retn.normals.size = vertIdx;
+            retn.colors.size = vertIdx;
+            retn.texCoord0.size = vertIdx;
+            retn.texCoord1.size = vertIdx;
+
+            retn.shapes.Add(new GeometryShape() {
+                shapeType = ShapeType.Sprite,
+                geometryType =  GeometryType.Physical,
+                vertexStart = vertexStart,
+                vertexCount = vertIdx,
+                triangleStart = triangleStart,
+                triangleCount = triIdx
+            });
         }
 
     }

@@ -6,7 +6,7 @@ SpriteAtlas:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: New Sprite Atlas
+  m_Name: TestAtlas
   m_EditorData:
     serializedVersion: 2
     textureSettings:
@@ -31,12 +31,24 @@ SpriteAtlas:
     variantMultiplier: 1
     packables:
     - {fileID: 2800000, guid: 077b84be6d052c34d933c79ef500be13, type: 3}
-    totalSpriteSurfaceArea: 18669
+    - {fileID: 2800000, guid: 056b6a3f6e14d4af2a7d641c4dd44e79, type: 3}
+    - {fileID: 2800000, guid: 344610008166ee2429e5fb9a360658f6, type: 3}
+    - {fileID: 2800000, guid: 54bcabc188c6640f1a298f013d4716df, type: 3}
+    - {fileID: 2800000, guid: 8a8849b7b8b964564b9e89cb1ded0658, type: 3}
+    totalSpriteSurfaceArea: 1069062
     bindAsDefault: 1
   m_MasterAtlas: {fileID: 0}
   m_PackedSprites:
+  - {fileID: 21300000, guid: 344610008166ee2429e5fb9a360658f6, type: 3}
+  - {fileID: 21300000, guid: 54bcabc188c6640f1a298f013d4716df, type: 3}
+  - {fileID: 21300000, guid: 8a8849b7b8b964564b9e89cb1ded0658, type: 3}
   - {fileID: 21300000, guid: 077b84be6d052c34d933c79ef500be13, type: 3}
+  - {fileID: 21300000, guid: 056b6a3f6e14d4af2a7d641c4dd44e79, type: 3}
   m_PackedSpriteNamesToIndex:
+  - oldguy
+  - frog-jump-1
+  - block
   - Light_Frame
-  m_Tag: New Sprite Atlas
+  - cherry-7
+  m_Tag: TestAtlas
   m_IsVariant: 0
