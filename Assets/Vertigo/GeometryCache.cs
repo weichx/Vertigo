@@ -152,12 +152,20 @@ namespace Vertigo {
             return shape.vertexCount;
         }
 
-        public void SetTexCoord1(int idx, StructList<Vector4> uvs) {
+        public void SetTexCoord0(int idx, StructList<Vector4> uvs) {
             if (idx < 0 || idx > shapes.size) {
                 return;
             }
             GeometryShape shape = shapes[idx];
             Array.Copy(uvs.array, 0, texCoord0.array, shape.vertexStart, shape.vertexCount);
+        }
+        
+        public void SetTexCoord1(int idx, StructList<Vector4> uvs) {
+            if (idx < 0 || idx > shapes.size) {
+                return;
+            }
+            GeometryShape shape = shapes[idx];
+            Array.Copy(uvs.array, 0, texCoord1.array, shape.vertexStart, shape.vertexCount);
         }
 
     }

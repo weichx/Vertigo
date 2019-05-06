@@ -3,6 +3,11 @@
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
+        _MaskTexture ("Mask", 2D) = "white" {}
+        _MaskSoftness ("Mask",  Range (0.001, 1)) = 0
+        _Radius ("Radius",  Range (1, 200)) = 0
+        [Toggle]
+        _InvertMask ("Invert Mask",  Int) = 0
     }
     SubShader
     {
@@ -28,7 +33,9 @@
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-
+            
+            #pragma multi_compile __ COLOR_ONLY
+            
             #include "UnityCG.cginc"
 
             struct appdata {
@@ -46,21 +53,34 @@
             };
 
             sampler2D _MainTex;
+            sampler2D _MaskTexture;
             float4 _MainTex_ST;
             float4 _Color;
+            float _Radius;
+            float _MaskSoftness;
+            float _InvertMask;
             
             v2f vert (appdata v) {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.color = v.color;
-                o.texCoord0 = float4(TRANSFORM_TEX(v.texCoord0.xy, _MainTex).xy, 0, 0);
+                o.texCoord0 = float4(v.texCoord0.xy, 0, 0);
                 o.texCoord1 = o.texCoord0;
                 return o;
             }
 
             fixed4 frag (v2f i) : SV_Target {
-                fixed4 col = tex2D(_MainTex, i.texCoord0.xy);
-                return lerp(fixed4(1, 0, 0, 1), col, col.a);
+                fixed maskAlpha = saturate(tex2D(_MaskTexture, i.texCoord0.xy).a / _MaskSoftness);
+                maskAlpha = lerp(1 - maskAlpha, maskAlpha, _InvertMask);
+                
+            fixed4 color;
+            #if COLOR_ONLY
+                color =  fixed4(1, 0, 0, 1); //i.color;
+            #else
+                color = tex2D(_MainTex, i.texCoord0.xy);
+            #endif
+                color.a *= maskAlpha;
+                return color;
             }
             ENDCG
         }

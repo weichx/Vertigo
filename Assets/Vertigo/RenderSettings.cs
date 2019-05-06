@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using UnityEngine;
 
 namespace Vertigo {
 
@@ -27,10 +28,15 @@ namespace Vertigo {
         [FieldOffset(14)] public byte cullMode;
         [FieldOffset(15)] public byte zTest;
 
+        [FieldOffset(16)] 
+        public Texture mask;
+        [FieldOffset(20)] 
+        public float maskSoftness;
+
         public bool IsEqualTo(RenderSettings other) {
             return blendArgs == other.blendArgs
                    && blendOpStencilRefMasks == other.blendOpStencilRefMasks
-                   && zWriteColorMaskCullMode == other.zWriteColorMaskCullMode;
+                   && zWriteColorMaskCullMode == other.zWriteColorMaskCullMode && mask == other.mask && maskSoftness == other.maskSoftness;
         }
 
         public static bool operator ==(RenderSettings a, RenderSettings b) {

@@ -9,7 +9,7 @@ namespace Vertigo {
 
         void AddDrawCall(Mesh mesh, VertigoMaterial material, in VertigoState state);
 
-        void Bake(StructList<BatchDrawCall> output);
+        void Bake(int width, int height, in Matrix4x4 cameraMatrix, StructList<BatchDrawCall> output);
 
         void Clear();
 
@@ -91,7 +91,7 @@ namespace Vertigo {
 
             s_IntScratch.SetFromRange(cache.triangles.array, triangleStart, triangleCount);
             for (int i = 0; i < s_IntScratch.size; i++) {
-                s_IntScratch.array[i] -= triangleStart;
+                s_IntScratch.array[i] -= vertexStart;
             }
 
             ListAccessor<int>.SetArray(s_MeshInt, s_IntScratch.array, triangleCount);
@@ -106,7 +106,7 @@ namespace Vertigo {
 
         public void AddDrawCall(Mesh mesh, VertigoMaterial material, in VertigoState state) { }
 
-        public void Bake(StructList<BatchDrawCall> output) {
+        public void Bake(int width, int height, in Matrix4x4 cameraMatrix, StructList<BatchDrawCall> output) {
             int drawCallCount = drawCallList.Count;
             DrawCall[] drawCalls = drawCallList.array;
             output.EnsureAdditionalCapacity(drawCallCount);

@@ -75,6 +75,10 @@ namespace Vertigo {
             material.SetColor(key, color);
         }
 
+        public void SetMainTexture(Texture texture) {
+            material.mainTexture = texture;
+        }
+
     }
 
 }

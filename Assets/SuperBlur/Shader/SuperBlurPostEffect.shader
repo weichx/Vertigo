@@ -210,12 +210,9 @@ Shader "Custom/SuperBlurPostEffect"
 		float2 offset2 = float2(_MainTex_TexelSize.x * _Radius * 3.29411764, 0.0);
 		float2 offset3 = float2(_MainTex_TexelSize.x * _Radius * 5.17647058, 0.0);
 
-	#if UNITY_VERSION >= 540
-		float2 uv = UnityStereoScreenSpaceUVAdjust(IN.uv, _MainTex_ST);
-	#else
-		float2 uv = IN.uv;
-	#endif
 
+		float2 uv = IN.uv;
+		
 		OUT.texcoord = uv;
 		OUT.blurTexcoord[0].xy = uv + offset1;
 		OUT.blurTexcoord[0].zw = uv - offset1;

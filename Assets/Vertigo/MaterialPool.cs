@@ -16,6 +16,7 @@ namespace Vertigo {
 
         private readonly Dictionary<string, List<VertigoMaterial>> instanceMaterialMap;
         private readonly Dictionary<string, List<VertigoMaterial>> sharedMaterialMap;
+        private static readonly LightList<string> s_Keywords = new LightList<string>(4);
 
         private LightList<string> sortContainer;
 
@@ -53,7 +54,18 @@ namespace Vertigo {
             }
         }
 
-        public VertigoMaterial GetInstance(string materialName, IList<string> keywords = null) {
+        
+        public VertigoMaterial GetInstance(string materialName, string keyword0 = null, string keyword1 = null, string keyword2 = null, string keyword3 = null) {
+            if(keyword0 != null) s_Keywords.Add(keyword0);    
+            if(keyword1 != null) s_Keywords.Add(keyword1);    
+            if(keyword2 != null) s_Keywords.Add(keyword2);    
+            if(keyword3 != null) s_Keywords.Add(keyword3);
+            VertigoMaterial retn = GetInstance(materialName, s_Keywords);
+            s_Keywords.Clear();
+            return retn;
+        }
+        
+        public VertigoMaterial GetInstance(string materialName, IList<string> keywords) {
             if (keywords != null) {
                 SortKeywords(keywords);
             }
@@ -71,14 +83,14 @@ namespace Vertigo {
                 }
 
                 materials.Add(retn);
-                return retn;
+                return retn.GetInstance();
             }
             else {
                 VertigoMaterial retn = CreateMaterial(materialName, keywords);
                 materials = new List<VertigoMaterial>();
                 materials.Add(retn);
                 sharedMaterialMap.Add(materialName, materials);
-                return retn;
+                return retn.GetInstance();
             }
         }
 
@@ -91,8 +103,10 @@ namespace Vertigo {
                 }
 
                 mat = new Material(shader);
-                for (int i = 0; i < keywords.Count; i++) {
-                    mat.EnableKeyword(keywords[i]);
+                if (keywords != null) {
+                    for (int i = 0; i < keywords.Count; i++) {
+                        mat.EnableKeyword(keywords[i]);
+                    }
                 }
             }
 
@@ -138,6 +152,10 @@ namespace Vertigo {
                 return false;
             }
 
+            if (material.keywords == null) {
+                return keywords.Count == 0;
+            }
+            
             if (keywords.Count != material.keywords.Length) {
                 return false;
             }

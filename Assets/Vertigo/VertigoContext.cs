@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -17,18 +18,14 @@ namespace Vertigo {
         public static readonly int shaderKey_ZWrite;
         public static readonly int shaderKey_BlendArgSrc;
         public static readonly int shaderKey_BlendArgDst;
+        public static readonly int shaderKey_MaskTexture;
+        public static readonly int shaderKey_MaskSoftness;
         private static readonly MaterialPropertyBlock s_PropertyBlock;
 
         public readonly MaterialPool materialPool;
         private readonly IDrawCallBatcher batcher;
-        private readonly StructList<BatchDrawCall> drawCalls;
         private VertigoState renderState;
         private Stack<VertigoState> stateStack;
-
-        private ShadowCastingMode shadowCastingMode = ShadowCastingMode.Off;
-        private bool receiveShadows = false;
-        private Transform lightProbeAnchor = null;
-        private LightProbeUsage lightProbeUsage = LightProbeUsage.Off;
 
         private Vector3 position;
         private Quaternion rotation;
@@ -37,6 +34,10 @@ namespace Vertigo {
         private readonly ShapeGenerator shapeGenerator;
         private readonly GeometryCache geometryCache;
         private readonly GeometryGenerator geometryGenerator;
+
+        private readonly Stack<RenderTexture> renderTextures;
+        private readonly StructList<RenderCall> renderCalls;
+        private readonly LightList<RenderTexture> renderTexturesToRelease;
 
         private RangeInt currentShapeRange;
 
@@ -51,10 +52,13 @@ namespace Vertigo {
                 materialPool = DefaultMaterialPool;
             }
 
+            this.renderTextures = new Stack<RenderTexture>();
+            this.renderCalls = new StructList<RenderCall>();
+            this.renderTexturesToRelease = new LightList<RenderTexture>();
+
             this.batcher = batcher;
             this.materialPool = materialPool;
             this.stateStack = new Stack<VertigoState>();
-            this.drawCalls = new StructList<BatchDrawCall>(16);
             this.position = Vector3.zero;
             this.rotation = Quaternion.identity;
             this.scale = Vector3.one;
@@ -122,11 +126,17 @@ namespace Vertigo {
             uvRect = new Rect(0, 0, 1, 1);
         }
 
-        public void SetUVTiling(float x, float y) { }
+        public void SetUVTiling(float x, float y) {
+            throw new NotImplementedException();
+        }
 
-        public void SetUVOffset(float x, float y) { }
+        public void SetUVOffset(float x, float y) {
+            throw new NotImplementedException();
+        }
 
-        public void Fill(GeometryCache cache, RangeInt range, VertigoMaterial material) { }
+        public void Fill(GeometryCache cache, RangeInt range, VertigoMaterial material) {
+            throw new NotImplementedException();
+        }
 
         public void DrawSprite(Sprite sprite, Rect rect, VertigoMaterial material) {
             int start = geometryCache.shapeCount;
@@ -157,58 +167,103 @@ namespace Vertigo {
                 Vector4[] uvs = s_ScratchVector4.array;
                 float minX = uvRect.x;
                 float minY = uvRect.y;
+                // todo -- might only work when uv rect is smaller than original
                 for (int i = 0; i < s_ScratchVector4.size; i++) {
                     // map bounds uvs to different rect uvs
                     uvs[i].x = minX + (uvs[i].x * uvRect.width);
                     uvs[i].y = minY + (uvs[i].y * uvRect.height);
                 }
 
-                geometryCache.SetTexCoord1(start, s_ScratchVector4);
+                geometryCache.SetTexCoord0(start, s_ScratchVector4);
             }
 
             batcher.AddDrawCall(geometryCache, new RangeInt(start, count), material, renderState);
         }
 
-        public void Flush(Camera camera) {
-            RenderTexture targetTexture = camera.targetTexture;
 
-            int width = Screen.width / 2;
-            int height = Screen.height / 2;
+        public RenderTexture Render() {
+            RenderTexture targetTexture = RenderTexture.active;
+
+            if (renderTextures.Count > 0) {
+                targetTexture = renderTextures.Peek();
+            }
+
+            int width = Screen.width;
+            int height = Screen.height;
 
             if (!ReferenceEquals(targetTexture, null)) {
-                width = targetTexture.width / 2;
-                height = targetTexture.height / 2;
+                width = targetTexture.width;
+                height = targetTexture.height;
             }
 
-            Matrix4x4 rootMat = Matrix4x4.TRS(new Vector3(-width, height), Quaternion.identity, Vector3.one);
-            batcher.Bake(drawCalls);
+            Matrix4x4 cameraMatrix = Matrix4x4.identity;
+
+            StructList<BatchDrawCall> drawCalls = StructList<BatchDrawCall>.Get();
+//            Matrix4x4 rootMat = Matrix4x4.TRS(new Vector3(-(width / 2), height / 2), Quaternion.identity, Vector3.one);
+            batcher.Bake(width, height, cameraMatrix, drawCalls);
             batcher.Clear();
 
-            int count = drawCalls.size;
-            BatchDrawCall[] calls = drawCalls.array;
+            renderCalls.Add(new RenderCall() {
+                // matrix?
+                texture = targetTexture,
+                drawCalls = drawCalls
+            });
 
-            for (int i = 0; i < count; i++) {
-                Mesh mesh = calls[i].mesh.mesh;
-                Material material = calls[i].material.material;
-                UpdateMaterialPropertyBlock(calls[i].state);
-                Graphics.DrawMesh(
-                    mesh,
-                    rootMat * calls[i].state.transform,
-                    material,
-                    0, camera, 0,
-                    s_PropertyBlock,
-                    shadowCastingMode,
-                    receiveShadows,
-                    lightProbeAnchor,
-                    lightProbeUsage
-                );
+            return targetTexture;
+        }
+
+        public void PushRenderTexture(int width, int height, RenderTextureFormat format = RenderTextureFormat.Default) {
+            RenderTexture renderTexture = RenderTexture.GetTemporary(width, height, 24, format);
+            renderTextures.Push(renderTexture);
+            renderTexturesToRelease.Add(renderTexture);
+        }
+
+        public void PopRenderTexture() {
+            if (renderTextures.Count != 0) {
+                renderTextures.Pop();
             }
-            
-            // create temp texture
-            // set render target
-            // do drawing
-            // set render target
-            
+        }
+
+        public void Flush(Camera camera, CommandBuffer commandBuffer) {
+            commandBuffer.Clear();
+
+            Matrix4x4 cameraMatrix = camera.worldToCameraMatrix;
+
+            for (int i = 0; i < renderCalls.Count; i++) {
+                RenderTexture renderTexture = renderCalls[i].texture ? renderCalls[i].texture : RenderTexture.active;
+                commandBuffer.SetRenderTarget(renderTexture);
+
+                if (!ReferenceEquals(renderTexture, null)) { // use render texture
+                    int width = renderTexture.width;
+                    int height = renderTexture.height;
+                    commandBuffer.ClearRenderTarget(true, true, Color.red);
+                    Matrix4x4 projection = Matrix4x4.Ortho(-width, width, -height, height, 0.3f, 999999);
+                    commandBuffer.SetViewProjectionMatrices(cameraMatrix, projection);
+                }
+                else { // use screen
+                    commandBuffer.SetViewProjectionMatrices(cameraMatrix, camera.projectionMatrix);
+                }
+
+//                Render(renderCalls[i].drawCalls);
+                int count = renderCalls[i].drawCalls.size;
+                BatchDrawCall[] calls = renderCalls[i].drawCalls.array;
+
+                for (int j = 0; j < count; j++) {
+                    Mesh mesh = calls[j].mesh.mesh;
+                    Material material = calls[j].material.material;
+                    UpdateMaterialPropertyBlock(calls[j].state);
+                    int passCount = material.passCount;
+                    // todo -- only render specified passes
+                    for (int k = 0; k < passCount; k++) {
+                        commandBuffer.DrawMesh(mesh, calls[j].state.transform, material, 0, k, s_PropertyBlock);
+                    }
+                }
+            }
+        }
+
+        public void SetMask(Texture texture, float softness) {
+            renderState.renderSettings.mask = texture;
+            renderState.renderSettings.maskSoftness = softness;
         }
 
         static VertigoContext() {
@@ -225,6 +280,8 @@ namespace Vertigo {
             shaderKey_ZWrite = Shader.PropertyToID("_ZWrite");
             shaderKey_BlendArgSrc = Shader.PropertyToID("_SrcBlend ");
             shaderKey_BlendArgDst = Shader.PropertyToID("_DstBlend ");
+            shaderKey_MaskTexture = Shader.PropertyToID("_MaskTexture");
+            shaderKey_MaskSoftness = Shader.PropertyToID("_MaskSoftness");
         }
 
         private static void UpdateMaterialPropertyBlock(in VertigoState state) {
@@ -239,21 +296,34 @@ namespace Vertigo {
             s_PropertyBlock.SetInt(shaderKey_ZWrite, state.renderSettings.zWrite ? 1 : 0);
             s_PropertyBlock.SetInt(shaderKey_BlendArgSrc, (int) state.renderSettings.blendArgSrc);
             s_PropertyBlock.SetInt(shaderKey_BlendArgDst, (int) state.renderSettings.blendArgDst);
+//            s_PropertyBlock.SetTexture(shaderKey_MaskTexture, ReferenceEquals(state.renderSettings.mask, null) ? Texture2D.whiteTexture : state.renderSettings.mask);
+           // s_PropertyBlock.SetFloat(shaderKey_MaskSoftness, state.renderSettings.maskSoftness);
         }
 
         public void Clear() {
+            for (int i = 0; i < renderTexturesToRelease.Count; i++) {
+                RenderTexture.ReleaseTemporary(renderTexturesToRelease[i]);
+            }
+
             currentShapeRange = new RangeInt(0, 0);
             shapeGenerator.Clear();
             geometryCache.Clear();
             geometryGenerator.ResetRenderState();
             renderState.transform = Matrix4x4.identity;
 
-            for (int i = 0; i < drawCalls.Count; i++) {
-                drawCalls[i].material.Release();
-                drawCalls[i].mesh.Release();
+            for (int i = 0; i < renderCalls.Count; i++) {
+                StructList<BatchDrawCall> drawCalls = renderCalls[i].drawCalls;
+                for (int j = 0; j < drawCalls.Count; j++) {
+                    drawCalls[j].material.Release();
+                    drawCalls[j].mesh.Release();
+                }
+
+                StructList<BatchDrawCall>.Release(ref drawCalls);
             }
 
-            drawCalls.QuickClear();
+            renderCalls.Clear();
+            renderTextures.Clear();
+            renderTexturesToRelease.Clear();
         }
 
         public void SetPosition(Vector3 position) {
@@ -273,6 +343,13 @@ namespace Vertigo {
 
         public void SetFillColor(Color32 color) {
             geometryGenerator.SetFillColor(color);
+        }
+
+        private struct RenderCall {
+
+            public RenderTexture texture;
+            public StructList<BatchDrawCall> drawCalls;
+
         }
 
     }
