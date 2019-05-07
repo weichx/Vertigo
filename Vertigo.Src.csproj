@@ -94,9 +94,7 @@
     <Compile Include="Assets\Vertigo\ShineEffectData.cs" />
     <Compile Include="Assets\Vertigo\StencilOp.cs" />
     <Compile Include="Assets\Vertigo\StrokePlacement.cs" />
-    <Compile Include="Assets\Vertigo\TextureAtlas.cs" />
     <Compile Include="Assets\Vertigo\TextureChannel.cs" />
-    <Compile Include="Assets\Vertigo\TexturePacker.cs" />
     <Compile Include="Assets\Vertigo\TexturePointer.cs" />
     <Compile Include="Assets\Vertigo\Vertex.cs" />
     <Compile Include="Assets\Vertigo\Vertigo.cs" />
@@ -108,11 +106,14 @@
     <Compile Include="Assets\Vertigo\VertigoState.cs" />
     <Compile Include="Assets\Vertigo\VertigoUtil.cs" />
     <None Include="Assets\Vertigo\Shaders\VertigoColorEffect.cginc" />
+    <None Include="Assets\Vertigo\Shaders\VertigoSDF.shader" />
     <None Include="Assets\Vertigo\Shaders\VertigoSoftmask.cginc" />
     <None Include="Assets\Vertigo\Vertigo.Src.asmdef" />
     <None Include="Assets\Vertigo\Shaders\VertigoBlur.cginc" />
     <None Include="Assets\Vertigo\Shaders\VertigoDefault.shader" />
     <None Include="Assets\Vertigo\Shaders\Vertigo.cginc" />
+    <None Include="Assets\Vertigo\Shaders\VertigoStructs.cginc" />
+    <None Include="Assets\Vertigo\Shaders\VertigoSDFUtil.cginc" />
     <None Include="Assets\Vertigo\Shaders\VertigoShineEffect.cginc" />
     <None Include="Assets\Vertigo\Shaders\VertigoTransitionEffect.cginc" />
     <None Include="Assets\Vertigo\Shaders\VertigoHSVEffect.cginc" />

@@ -1,6 +1,8 @@
 #ifndef VERTIGO_INCLUDED
 #define VERTIGO_INCLUDED
 
+   
+            
 // Unpack float to low-precision [0-1] fixed4.
 fixed4 UnpackToVec4(float value) {
 	const int packStep = 64;

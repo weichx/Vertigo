@@ -62,7 +62,6 @@
     <Compile Include="Assets\SuperBlur\Core\SuperBlurBase.cs" />
     <Compile Include="Assets\SuperBlur\SuperBlur.cs" />
     <Compile Include="Assets\SuperBlur\SuperBlurFast.cs" />
-    <None Include="Assets\VertigoSDF.shader" />
     <None Include="Assets\Resources\GrabBlur.shader" />
     <None Include="Assets\SuperBlur\Shader\SuperBlurPostEffect.shader" />
     <None Include="Assets\Resources\VertigoMask.cginc" />

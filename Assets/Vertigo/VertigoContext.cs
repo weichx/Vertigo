@@ -5,6 +5,13 @@ using UnityEngine.Rendering;
 
 namespace Vertigo {
 
+    public enum ShapeMode {
+
+        Physical,
+        SDF
+
+    }
+    
     public class VertigoContext {
 
         public static readonly int shaderKey_StencilRef;
@@ -38,12 +45,14 @@ namespace Vertigo {
         private readonly Stack<RenderTexture> renderTextures;
         private readonly StructList<RenderCall> renderCalls;
         private readonly LightList<RenderTexture> renderTexturesToRelease;
-
         private RangeInt currentShapeRange;
-
+        private ShapeMode defaultShapeMode;
+        private VertigoMaterial strokeMaterial;
+        private VertigoMaterial fillMaterial;
         public static MaterialPool DefaultMaterialPool { get; }
 
-        public VertigoContext(IDrawCallBatcher batcher = null, MaterialPool materialPool = null) {
+
+        public VertigoContext(ShapeMode shapeMode = ShapeMode.SDF, IDrawCallBatcher batcher = null, MaterialPool materialPool = null) {
             if (batcher == null) {
                 batcher = new DefaultDrawCallBatcher();
             }
@@ -51,6 +60,8 @@ namespace Vertigo {
             if (materialPool == null) {
                 materialPool = DefaultMaterialPool;
             }
+
+            this.defaultShapeMode = shapeMode;
 
             this.renderTextures = new Stack<RenderTexture>();
             this.renderCalls = new StructList<RenderCall>();
@@ -67,6 +78,40 @@ namespace Vertigo {
             this.geometryCache = new GeometryCache();
         }
 
+        public void SetMaterial(VertigoMaterial material) {
+            this.fillMaterial = material;
+            this.strokeMaterial = material;
+        }
+        
+        public void SetFillMaterial(VertigoMaterial material) {
+            this.fillMaterial = material;
+        }
+        
+        public void SetStrokeMaterial(VertigoMaterial material) {
+            this.strokeMaterial = material;
+        }
+
+        public void FillCircle(float x, float y, float radius, VertigoMaterial material = null) {
+            material = material ?? fillMaterial;
+            int pathId = shapeGenerator.Circle(x, y, radius);
+            geometryGenerator.Fill(shapeGenerator, new RangeInt(pathId, 1), defaultShapeMode, geometryCache);
+            batcher.AddDrawCall(geometryCache, new RangeInt(geometryCache.shapeCount - 1, 1), material, renderState);
+        }
+        
+        public void FillEllipse(float x, float y, float rw, float rh, VertigoMaterial material = null) {
+            material = material ?? fillMaterial;
+            int pathId = shapeGenerator.Ellipse(x, y, rw, rh);
+            geometryGenerator.Fill(shapeGenerator, new RangeInt(pathId, 1), defaultShapeMode, geometryCache);
+            batcher.AddDrawCall(geometryCache, new RangeInt(geometryCache.shapeCount - 1, 1), material, renderState);
+        }
+
+        public void FillRoundedRect(float x, float y, float width, float height, float rTL, float rTR, float rBL, float rBR, VertigoMaterial material = null) {
+            material = material ?? fillMaterial;
+            int pathId = shapeGenerator.RoundedRect(x, y, width, height, rTL, rTR, rBL, rBR);
+            geometryGenerator.Fill(shapeGenerator, new RangeInt(pathId, 1), defaultShapeMode, geometryCache);
+            batcher.AddDrawCall(geometryCache, new RangeInt(geometryCache.shapeCount - 1, 1), material, renderState);
+        }
+        
         public void SaveState() {
             stateStack.Push(renderState);
         }
@@ -159,7 +204,7 @@ namespace Vertigo {
             }
 
             int start = geometryCache.shapeCount;
-            geometryGenerator.Fill(shapeGenerator, currentShapeRange, geometryCache);
+            geometryGenerator.Fill(shapeGenerator, currentShapeRange, defaultShapeMode, geometryCache);
             int count = geometryCache.shapeCount - start;
 
             if (uvRect.x != 0 || uvRect.y != 0 || uvRect.width != 1 || uvRect.height != 1) {

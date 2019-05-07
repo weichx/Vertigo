@@ -19,10 +19,14 @@ public class VertigoBehaviorRoot : MonoBehaviour {
     public float softness;
     public SpriteAtlas atlas;
 
+    public float width;
+    public float height;
+    public Vector4 radii;
+    
     private CommandBuffer commandBuffer;
 
     public void Start() {
-        ctx = new VertigoContext();
+        ctx = new VertigoContext(ShapeMode.SDF);
         commandBuffer = new CommandBuffer();
         camera.AddCommandBuffer(CameraEvent.AfterEverything, commandBuffer);
     }
@@ -36,7 +40,7 @@ public class VertigoBehaviorRoot : MonoBehaviour {
         VertigoMaterial defaultMaterial = ctx.materialPool.GetInstance("VertigoSDF");
         VertigoMaterial bgMat = ctx.materialPool.GetInstance("VertigoSDF");
 
-        ctx.Rect(0, 0, 32, 32);
+        ctx.FillRoundedRect(0, 0, width, height, radii.x, radii.y, radii.z, radii.w, defaultMaterial);
 
         // PushRenderTexture();
         // ctx.SaveState();
@@ -106,10 +110,10 @@ public class VertigoBehaviorRoot : MonoBehaviour {
 //            ctx.BeginPath();
 //        ctx.LineTo();
 //        
-        ctx.Fill(bgMat);
-        
-        ctx.SetMask(lightFrame, softness);
-        ctx.Fill(bgMat);
+//        ctx.Fill(bgMat);
+//        
+//        ctx.SetMask(lightFrame, softness);
+//        ctx.Fill(bgMat);
         ctx.Render();
         ctx.Flush(camera, commandBuffer);
     }

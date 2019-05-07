@@ -4,8 +4,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vertigo.Src", "Vertigo.Src.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Assembly-CSharp", "Assembly-CSharp.csproj", "{C0DFE067-1BCF-6A03-6E11-8F580043E917}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Assembly-CSharp-Editor", "Assembly-CSharp-Editor.csproj", "{02878D23-A9C5-D86E-260E-CEED76A8537E}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,10 +18,6 @@ Global
 		{C0DFE067-1BCF-6A03-6E11-8F580043E917}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C0DFE067-1BCF-6A03-6E11-8F580043E917}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C0DFE067-1BCF-6A03-6E11-8F580043E917}.Release|Any CPU.Build.0 = Release|Any CPU
-		{02878D23-A9C5-D86E-260E-CEED76A8537E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{02878D23-A9C5-D86E-260E-CEED76A8537E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{02878D23-A9C5-D86E-260E-CEED76A8537E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{02878D23-A9C5-D86E-260E-CEED76A8537E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

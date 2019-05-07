@@ -1,4 +1,5 @@
 using System;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Vertigo {
@@ -43,7 +44,7 @@ namespace Vertigo {
         public void VerticalLineTo(float y) {
             LineTo(lastPoint.x, y);
         }
-        
+
         public void CubicBezierTo(float c0x, float c0y, float c1x, float c1y, float x, float y) {
             int pointCount = 0;
             Vector2 end = new Vector2(x, y);
@@ -134,34 +135,48 @@ namespace Vertigo {
             shapes.Add(shapeDef);
         }
 
-        // todo -- not working yet
-        public void RoundedRect(float x, float y, float width, float height, float r0, float r1, float r2, float r3) {
+        public int RoundedRect(float x, float y, float width, float height, float r0, float r1, float r2, float r3) {
             ShapeDef shapeDef = new ShapeDef(ShapeType.RoundedRect);
             shapeDef.p0 = new Vector2(x, y);
             shapeDef.p1 = new Vector2(width, height);
+
+            float min = math.min(width, height);
+            
+            if (min <= 0) min = 0.0001f;
+            
+            float halfMin = min * 0.5f;
+
+            r0 = math.clamp(r0, 0, halfMin) / min;
+            r1 = math.clamp(r1, 0, halfMin) / min;
+            r2 = math.clamp(r2, 0, halfMin) / min;
+            r3 = math.clamp(r3, 0, halfMin) / min;
+            
             shapeDef.p2 = new Vector2(r0, r1);
             shapeDef.p3 = new Vector2(r2, r3);
             shapeDef.bounds = new Rect(x, y, width, height);
             shapes.Add(shapeDef);
+            return shapes.Count - 1;
         }
 
-        public void Circle(float x, float y, float r, int segmentCount = 50) {
+        public int Circle(float x, float y, float r, int segmentCount = 50) {
             float diameter = r * 2;
             ShapeDef shapeDef = new ShapeDef(ShapeType.Circle);
             shapeDef.p0 = new Vector2(x, y);
-            shapeDef.p1 = new Vector2(r, 0);
+            shapeDef.p1 = new Vector2(diameter, diameter);
             shapeDef.p2 = new Vector2(segmentCount, 0);
             shapeDef.bounds = new Rect(x, y, diameter, diameter);
             shapes.Add(shapeDef);
+            return shapes.Count - 1;
         }
 
-        public void Ellipse(float x, float y, float rw, float rh, int segmentCount = 50) {
+        public int Ellipse(float x, float y, float rw, float rh, int segmentCount = 50) {
             ShapeDef shapeDef = new ShapeDef(ShapeType.Ellipse);
             shapeDef.p0 = new Vector2(x, y);
             shapeDef.p1 = new Vector2(rw, rh);
             shapeDef.p2 = new Vector2(segmentCount, 0);
             shapeDef.bounds = new Rect(x, y, rw * 2, rh * 2);
             shapes.Add(shapeDef);
+            return shapes.Count - 1;
         }
 
         public void RegularPolygon(float x, float y, float width, float height, int sides) {
@@ -245,9 +260,9 @@ namespace Vertigo {
             if (end - start == 0) {
                 return;
             }
-            
+
             PathPoint[] array = holes.array;
-            
+
             float minX = rect.xMin;
             float minY = rect.yMin;
             float maxX = rect.xMax;
@@ -263,7 +278,7 @@ namespace Vertigo {
                 array[i].position.y = y;
             }
         }
-        
+
         public void Clear() {
             shapes.QuickClear();
             points.QuickClear();
